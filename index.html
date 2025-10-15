@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>GenAI Upload & Download</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; line-height: 1.4; }
+    section { margin-bottom: 2.5rem; }
+    label { display: block; margin-bottom: 0.5rem; }
+    input[type="text"] { width: 20rem; padding: 0.4rem; }
+    button { margin-top: 0.75rem; margin-right: 0.5rem; padding: 0.5rem 1rem; cursor: pointer; }
+    #status { margin-top: 1.5rem; min-height: 1.2rem; color: #0b5394; }
+    #status.error { color: #a61c1c; }
+  </style>
+</head>
+<body>
+  <section>
+    <h2>Upload to GenAI</h2>
+    <label for="uploadFile">Choose a text file to process:</label>
+    <input type="file" id="uploadFile" accept=".txt,.md,.docx,.pdf">
+    <div>
+      <button type="button" onclick="uploadToS3()">Upload</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Download Results</h2>
+    <label for="filename">Source filename (e.g. <em>sample.txt</em>):</label>
+    <input type="text" id="filename" placeholder="Enter filename">
+    <div>
+      <button type="button" onclick="downloadFile('summary')">Download Summary</button>
+      <button type="button" onclick="downloadFile('translation')">Download Translation</button>
+    </div>
+  </section>
+
+  <div id="status"></div>
+
+  <script>
+    const UPLOAD_ENDPOINT = "https://w840oeg9lg.execute-api.us-east-1.amazonaws.com/default/GenerateUploadURL";
+    const DOWNLOAD_ENDPOINT = "https://r62nxdnlhi.execute-api.us-east-1.amazonaws.com/default/GenerateDownloadURL";
+    const FOLDER_MAP = { summary: "summaries", translation: "translations" };
+
+    function setStatus(message, isError = false) {
+      const statusEl = document.getElementById("status");
+      statusEl.textContent = message;
+      statusEl.className = isError ? "error" : "";
+    }
+
+    async function uploadToS3() {
+      const fileInput = document.getElementById("uploadFile");
+      const file = fileInput.files[0];
+
+      if (!file) {
+        setStatus("Select a file before uploading.", true);
+        return;
+      }
+
+      setStatus(`Requesting upload URL for ${file.name}...`);
+
+      try {
+        const presignRes = await fetch(`${UPLOAD_ENDPOINT}?filename=${encodeURIComponent(file.name)}`);
+        if (!presignRes.ok) {
+          throw new Error(`Failed to get upload URL (${presignRes.status})`);
+        }
+
+        const payload = await presignRes.json();
+        const data =
+          typeof payload.body === "string" && !payload.url
+            ? JSON.parse(payload.body)
+            : payload;
+
+        const { url, bucket, key, error } = data;
+        if (error) {
+          throw new Error(error);
+        }
+        if (!url) {
+          throw new Error("Upload URL missing from response.");
+        }
+
+        const putRes = await fetch(url, {
+          method: "PUT",
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+          body: file,
+        });
+
+        if (!putRes.ok) {
+          throw new Error(`Upload failed (${putRes.status})`);
+        }
+
+        setStatus(`Upload complete! Stored as s3://${bucket}/${key}`);
+        fileInput.value = "";
+      } catch (err) {
+        setStatus(err.message || "Upload failed.", true);
+      }
+    }
+
+    async function downloadFile(kind) {
+      const folder = FOLDER_MAP[kind];
+      if (!folder) {
+        setStatus(`Unknown download type '${kind}'.`, true);
+        return;
+      }
+
+      const filename = document.getElementById("filename").value.trim();
+      if (!filename) {
+        setStatus("Enter the original filename before downloading.", true);
+        return;
+      }
+
+      setStatus(`Requesting ${kind} download link...`);
+
+      try {
+        const res = await fetch(
+          `${DOWNLOAD_ENDPOINT}?folder=${encodeURIComponent(folder)}&filename=${encodeURIComponent(filename)}`
+        );
+
+        if (!res.ok) {
+          throw new Error(`Failed to get download URL (${res.status})`);
+        }
+
+        const payload = await res.json();
+        const data =
+          typeof payload.body === "string" && !payload.url
+            ? JSON.parse(payload.body)
+            : payload;
+
+        const { url, error } = data;
+        if (error) {
+          throw new Error(error);
+        }
+        if (!url) {
+          throw new Error("Download URL missing from response.");
+        }
+
+        window.open(url, "_blank", "noopener");
+        setStatus("Download link opened in a new tab.");
+      } catch (err) {
+        setStatus(err.message || "Download failed.", true);
+      }
+    }
+  </script>
+</body>
+</html>

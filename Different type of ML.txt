@@ -1,0 +1,27 @@
+Different type of ML
+1. SUpervised learning - label data
+2.umSUpervised learning - unlabeled data
+3.
+
+
+AI
+AI everything
+ML computer science behind how it happens, the mathc behind it
+can be supervises, unsupervised and re enforecement arning
+
+inside of that we have layers 
+the structure of how things are calculated, neural networsk are going in deeper and see how things happens has inputs and output could be simple of complex
+
+Complex side is Deep learning how machine learens when they are super intelligent, going deep insided dep learning
+
+we have 
+
+generative AI.. thype of ML that generates new context, it uses deep leanring,deeplinenay uses NN, ML uses NN
+
+18 25 October 9am to 1pm
+
+Bed Rock
+Bedrock Agentcore
+
+
+

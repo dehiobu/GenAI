@@ -1,0 +1,3 @@
+﻿Amazon Bedrock test.
+This is a tiny sample to verify the S3  Lambda  Bedrock (Titan)  Translate  S3 flow.
+The function should summarise this and produce French output.

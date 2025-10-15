@@ -1,0 +1,105 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: S3 -> Lambda -> Bedrock + Translate -> S3 (inline IAM)
+
+Parameters:
+  IngestBucketName: { Type: String, Default: genai-in-use1-x7p5f0 }
+  OutputBucketName: { Type: String, Default: genai-out-use1-x7p5f0 }
+  TargetLanguage:   { Type: String, Default: fr }
+  ModelId:          { Type: String, Default: amazon.titan-text-lite-v1 }
+  MemoryMB:         { Type: Number, Default: 1024 }
+  TimeoutSec:       { Type: Number, Default: 120 }
+
+Resources:
+  IngestBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref IngestBucketName
+      VersioningConfiguration: { Status: Enabled }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  OutputBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref OutputBucketName
+      VersioningConfiguration: { Status: Enabled }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: CleanupErrorsAfter90d
+            Status: Enabled
+            Prefix: errors/
+            ExpirationInDays: 90
+
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "s3-bedrock-translate-role-${AWS::StackName}"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: inline-lambda-permissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents]
+                Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action: [s3:GetObject, s3:GetObjectAttributes]
+                Resource: !Sub arn:aws:s3:::${IngestBucketName}/*
+              - Effect: Allow
+                Action: [s3:PutObject]
+                Resource: !Sub arn:aws:s3:::${OutputBucketName}/*
+              - Effect: Allow
+                Action: [bedrock:InvokeModel]
+                Resource: arn:aws:bedrock:us-east-1::foundation-model/*
+              - Effect: Allow
+                Action: [translate:TranslateText, comprehend:DetectDominantLanguage]
+                Resource: "*"
+
+  SummariseTranslateFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.lambda_handler
+      Runtime: python3.11
+      Role: !GetAtt LambdaRole.Arn
+      MemorySize: !Ref MemoryMB
+      Timeout: !Ref TimeoutSec
+      Environment:
+        Variables:
+          OUTPUT_BUCKET: !Ref OutputBucketName
+          SUMMARY_PREFIX: summaries/
+          TRANSLATION_PREFIX: translations/
+          TARGET_LANG: !Ref TargetLanguage
+          MODEL_ID: !Ref ModelId
+          MAX_BYTES: 500000
+      Events:
+        S3Put:
+          Type: S3
+          Properties:
+            Bucket: !Ref IngestBucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - { Name: prefix, Value: incoming/ }
+                  - { Name: suffix, Value: .txt }
+
+Outputs:
+  FunctionName: { Value: !Ref SummariseTranslateFn }
+  IngestBucketOut: { Value: !Ref IngestBucket }
+  OutputBucketOut: { Value: !Ref OutputBucket }
