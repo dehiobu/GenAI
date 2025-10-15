@@ -1,0 +1,36 @@
+name: Deploy to Lightsail
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Upload site assets
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          port: ${{ secrets.LIGHTSAIL_SSH_PORT || '22' }}
+          source: "index.html"
+          target: "/tmp/genai-site"
+
+      - name: Activate new build
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          port: ${{ secrets.LIGHTSAIL_SSH_PORT || '22' }}
+          script: |
+            set -e
+            sudo mkdir -p /tmp/genai-site
+            sudo rsync -av --delete /tmp/genai-site/ /var/www/html/
+            sudo systemctl reload apache2
