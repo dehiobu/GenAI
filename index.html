@@ -79,12 +79,13 @@
 
         const putRes = await fetch(url, {
           method: "PUT",
-          headers: { "Content-Type": file.type || "application/octet-stream" },
           body: file,
         });
 
         if (!putRes.ok) {
-          throw new Error(`Upload failed (${putRes.status})`);
+          const errorText = await putRes.text().catch(() => "");
+          const message = errorText ? `${putRes.status} ${errorText}` : `${putRes.status} ${putRes.statusText}`;
+          throw new Error(`Upload failed (${message.trim()})`);
         }
 
         setStatus(`Upload complete! Stored as s3://${bucket}/${key}`);
