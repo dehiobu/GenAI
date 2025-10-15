@@ -10,7 +10,11 @@ FOLDER_CONFIG = {
     "summaries": {"bucket": "genai-out-use1-x7p5f0", "prefix": "summaries/"},
     "translations": {"bucket": "genai-out-use1-x7p5f0", "prefix": "translations/"},
 }
-CORS_HEADERS = {"Access-Control-Allow-Origin": "*"}
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "*",
+    "Access-Control-Allow-Methods": "GET,OPTIONS",
+}
 
 s3 = boto3.client("s3", region_name=REGION)
 
@@ -24,6 +28,9 @@ def _response(status_code: int, payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def lambda_handler(event, context):
+    if event.get("httpMethod") == "OPTIONS":
+        return _response(200, {"message": "ok"})
+
     params = event.get("queryStringParameters") or {}
     filename = params.get("filename")
     folder = params.get("folder")
@@ -35,8 +42,6 @@ def lambda_handler(event, context):
     if not config:
         return _response(400, {"error": f"Unsupported folder '{folder}'"})
 
-    # Strip leading slashes and guard against traversal attempts so callers
-    # cannot escape the configured prefix.
     sanitized = filename.lstrip("/")
     if not sanitized:
         return _response(400, {"error": "Invalid filename"})
