@@ -48,6 +48,9 @@ Examples
 - **Inspect processing errors**
   1. `aws s3 cp s3://genai-out-use1-x7p5f0/errors/<name>.error.json -`
   2. `aws logs tail /aws/lambda/SummariseTranslateFn --since 10m --format short`
+- **List generated files through API**
+  1. `Invoke-WebRequest -Uri "<download-endpoint>?folder=summaries&list=true"`
+  2. `Invoke-WebRequest -Uri "<download-endpoint>?folder=translations&list=true"`
 - **Deploy full stack via PowerShell**
   1. `.\deploy-genai.ps1 -Region us-east-1 -ArtifactsBucket cfn-artifacts-use1-x7p5f0 -StackName genai-sumtrans -IngestBucket genai-in-use1-x7p5f0 -OutputBucket genai-out-use1-x7p5f0 -TargetLang fr -ModelId amazon.titan-text-lite-v1`
   2. (Optional) `.\deploy-genai2.ps1 -ForceRedeploy -VerboseAWS`

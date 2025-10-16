@@ -11,6 +11,20 @@
     button { margin-top: 0.75rem; margin-right: 0.5rem; padding: 0.5rem 1rem; cursor: pointer; }
     #status { margin-top: 1.5rem; min-height: 1.2rem; color: #0b5394; }
     #status.error { color: #a61c1c; }
+    .download-grid { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 1rem; }
+    .download-column { flex: 1 1 18rem; }
+    .download-column h3 { margin-bottom: 0.5rem; }
+    .download-list { list-style: none; padding: 0; margin: 0; border: 1px solid #d9d9d9; border-radius: 6px; max-height: 14rem; overflow-y: auto; }
+    .download-list li { padding: 0.6rem 0.75rem; border-bottom: 1px solid #e9e9e9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .download-list li:last-child { border-bottom: none; }
+    .download-list button { background: none; border: none; padding: 0; margin: 0; text-align: left; font: inherit; color: #0b5394; cursor: pointer; }
+    .download-list button:hover { text-decoration: underline; }
+    .download-list .meta { color: #666; font-size: 0.85rem; }
+    .download-message { padding: 0.6rem 0.75rem; color: #666; font-style: italic; text-align: center; }
+    .download-message.error { color: #a61c1c; font-style: normal; }
+    .download-controls { margin-top: 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+    .download-controls label { display: inline-flex; align-items: center; margin: 0; }
+    .download-controls button { margin-top: 0; }
   </style>
 </head>
 <body>
@@ -25,9 +39,21 @@
 
   <section>
     <h2>Download Results</h2>
-    <label for="filename">Source filename (e.g. <em>sample.txt</em>):</label>
-    <input type="text" id="filename" placeholder="Enter filename">
-    <div>
+    <p>Click a file below to download it, or use the manual option if you already know the original filename.</p>
+    <div class="download-grid">
+      <div class="download-column">
+        <h3>Summaries</h3>
+        <ul id="summaryList" class="download-list"></ul>
+      </div>
+      <div class="download-column">
+        <h3>Translations</h3>
+        <ul id="translationList" class="download-list"></ul>
+      </div>
+    </div>
+    <div class="download-controls">
+      <button type="button" onclick="refreshDownloadLists()">Refresh lists</button>
+      <label for="filename">Manual download (original filename, e.g. <em>sample.txt</em>):</label>
+      <input type="text" id="filename" placeholder="Enter filename">
       <button type="button" onclick="downloadFile('summary')">Download Summary</button>
       <button type="button" onclick="downloadFile('translation')">Download Translation</button>
     </div>
@@ -39,11 +65,147 @@
     const UPLOAD_ENDPOINT = "https://w840oeg9lg.execute-api.us-east-1.amazonaws.com/default/GenerateUploadURL";
     const DOWNLOAD_ENDPOINT = "https://r62nxdnlhi.execute-api.us-east-1.amazonaws.com/default/GenerateDownloadURL";
     const FOLDER_MAP = { summary: "summaries", translation: "translations" };
+    const LIST_IDS = { summary: "summaryList", translation: "translationList" };
 
     function setStatus(message, isError = false) {
       const statusEl = document.getElementById("status");
       statusEl.textContent = message;
       statusEl.className = isError ? "error" : "";
+    }
+
+    function parseLambdaPayload(payload) {
+      if (payload && typeof payload === "object" && typeof payload.body === "string") {
+        try {
+          return JSON.parse(payload.body);
+        } catch (err) {
+          console.error("Failed to parse Lambda response body", err);
+          return {};
+        }
+      }
+      return payload || {};
+    }
+
+    function getListElement(kind) {
+      const id = LIST_IDS[kind];
+      if (!id) {
+        throw new Error(`Unknown list kind '${kind}'`);
+      }
+      return document.getElementById(id);
+    }
+
+    function setListMessage(kind, message, type = "info") {
+      const listEl = getListElement(kind);
+      listEl.innerHTML = "";
+      const li = document.createElement("li");
+      li.className = `download-message ${type}`;
+      li.textContent = message;
+      listEl.appendChild(li);
+    }
+
+    function formatTimestamp(iso) {
+      if (!iso) {
+        return "";
+      }
+      const date = new Date(iso);
+      if (Number.isNaN(date.getTime())) {
+        return "";
+      }
+      return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+    }
+
+    function formatSize(bytes) {
+      if (typeof bytes !== "number" || Number.isNaN(bytes)) {
+        return "";
+      }
+      if (bytes === 0) {
+        return "0 B";
+      }
+      const units = ["B", "KB", "MB", "GB", "TB"];
+      let value = bytes;
+      let unitIndex = 0;
+      while (value >= 1024 && unitIndex < units.length - 1) {
+        value /= 1024;
+        unitIndex += 1;
+      }
+      const precision = unitIndex === 0 ? 0 : value < 10 ? 1 : 0;
+      return `${value.toFixed(precision)} ${units[unitIndex]}`;
+    }
+
+    function renderDownloadList(kind, files) {
+      const listEl = getListElement(kind);
+      listEl.innerHTML = "";
+
+      if (!Array.isArray(files) || files.length === 0) {
+        const li = document.createElement("li");
+        li.className = "download-message empty";
+        li.textContent = "No files yet.";
+        listEl.appendChild(li);
+        return;
+      }
+
+      files.forEach((file) => {
+        const li = document.createElement("li");
+
+        const button = document.createElement("button");
+        button.type = "button";
+        const displayName = file?.filename || file?.key || "download";
+        button.textContent = displayName;
+        button.addEventListener("click", () => downloadFile(kind, displayName));
+        li.appendChild(button);
+
+        const metaParts = [];
+        const when = formatTimestamp(file?.last_modified);
+        if (when) {
+          metaParts.push(when);
+        }
+        const sizeLabel = formatSize(file?.size);
+        if (sizeLabel) {
+          metaParts.push(sizeLabel);
+        }
+        if (metaParts.length) {
+          const meta = document.createElement("span");
+          meta.className = "meta";
+          meta.textContent = metaParts.join(" • ");
+          li.appendChild(meta);
+        }
+
+        listEl.appendChild(li);
+      });
+    }
+
+    async function fetchDownloadList(kind) {
+      const folder = FOLDER_MAP[kind];
+      if (!folder) {
+        return;
+      }
+
+      setListMessage(kind, "Loading…", "loading");
+
+      try {
+        const res = await fetch(
+          `${DOWNLOAD_ENDPOINT}?folder=${encodeURIComponent(folder)}&list=true`
+        );
+
+        if (!res.ok) {
+          throw new Error(`Failed to load ${kind} files (${res.status})`);
+        }
+
+        const payload = await res.json();
+        const data = parseLambdaPayload(payload);
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        renderDownloadList(kind, data.files || []);
+      } catch (err) {
+        console.error(err);
+        setListMessage(kind, err.message || `Unable to load ${kind} files.`, "error");
+      }
+    }
+
+    async function refreshDownloadLists() {
+      await Promise.all(["summary", "translation"].map(fetchDownloadList));
     }
 
     async function uploadToS3() {
@@ -67,10 +229,7 @@
         }
 
         const payload = await presignRes.json();
-        const data =
-          typeof payload.body === "string" && !payload.url
-            ? JSON.parse(payload.body)
-            : payload;
+        const data = parseLambdaPayload(payload);
 
         const { url, bucket, key, error } = data;
         if (error) {
@@ -96,25 +255,31 @@
 
         setStatus(`Upload complete! Stored as s3://${bucket}/${key}`);
         fileInput.value = "";
+        refreshDownloadLists().catch((err) => console.error("Failed to refresh lists after upload", err));
       } catch (err) {
         setStatus(err.message || "Upload failed.", true);
       }
     }
 
-    async function downloadFile(kind) {
+    async function downloadFile(kind, overrideFilename) {
       const folder = FOLDER_MAP[kind];
       if (!folder) {
         setStatus(`Unknown download type '${kind}'.`, true);
         return;
       }
 
-      const filename = document.getElementById("filename").value.trim();
+      const filenameInput = document.getElementById("filename");
+      const rawFilename = overrideFilename ?? filenameInput.value;
+      const filename = (rawFilename || "").trim();
       if (!filename) {
         setStatus("Enter the original filename before downloading.", true);
         return;
       }
+      if (overrideFilename) {
+        filenameInput.value = overrideFilename;
+      }
 
-      setStatus(`Requesting ${kind} download link...`);
+      setStatus(`Requesting ${kind} download link for ${filename}...`);
 
       try {
         const res = await fetch(
@@ -126,10 +291,7 @@
         }
 
         const payload = await res.json();
-        const data =
-          typeof payload.body === "string" && !payload.url
-            ? JSON.parse(payload.body)
-            : payload;
+        const data = parseLambdaPayload(payload);
 
         const { url, error } = data;
         if (error) {
@@ -145,6 +307,13 @@
         setStatus(err.message || "Download failed.", true);
       }
     }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      refreshDownloadLists().catch((err) => {
+        console.error(err);
+        setStatus("Unable to load file lists right now.", true);
+      });
+    });
   </script>
 </body>
 </html>

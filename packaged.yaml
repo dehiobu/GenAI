@@ -102,7 +102,7 @@ Resources:
   SummariseTranslateFn:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: s3://cfn-artifacts-use1-x7p5f0/95740ffd9eaf5e1e2cfce72a326f00cf
+      CodeUri: s3://cfn-artifacts-use1-x7p5f0/358274b8b83ab59f648e85bc5d371f19
       Handler: app.lambda_handler
       Runtime: python3.11
       Role:
