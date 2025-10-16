@@ -74,7 +74,7 @@ Resources:
             - logs:CreateLogStream
             - logs:PutLogEvents
             Resource: arn:aws:logs:*:*:*
-         - Effect: Allow
+          - Effect: Allow
             Action:
             - s3:ListBucket
             Resource:
@@ -102,7 +102,7 @@ Resources:
   SummariseTranslateFn:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: s3://cfn-artifacts-use1-x7p5f0/22822fe246149b8eaf76b0ce70b7b347
+      CodeUri: s3://cfn-artifacts-use1-x7p5f0/95740ffd9eaf5e1e2cfce72a326f00cf
       Handler: app.lambda_handler
       Runtime: python3.11
       Role:
