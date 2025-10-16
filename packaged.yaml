@@ -74,6 +74,11 @@ Resources:
             - logs:CreateLogStream
             - logs:PutLogEvents
             Resource: arn:aws:logs:*:*:*
+         - Effect: Allow
+            Action:
+            - s3:ListBucket
+            Resource:
+              Fn::Sub: arn:aws:s3:::${IngestBucketName}
           - Effect: Allow
             Action:
             - s3:GetObject

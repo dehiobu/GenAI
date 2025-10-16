@@ -58,6 +58,9 @@ Resources:
                 Action: [logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents]
                 Resource: arn:aws:logs:*:*:*
               - Effect: Allow
+                Action: [s3:ListBucket]
+                Resource: !Sub arn:aws:s3:::${IngestBucketName}
+              - Effect: Allow
                 Action: [s3:GetObject, s3:GetObjectAttributes]
                 Resource: !Sub arn:aws:s3:::${IngestBucketName}/*
               - Effect: Allow
