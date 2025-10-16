@@ -2,6 +2,7 @@ import json
 import gzip
 import os
 import re
+from urllib.parse import unquote_plus
 
 import boto3
 
@@ -218,7 +219,7 @@ def _put_text(bucket: str, key: str, text: str):
 def lambda_handler(event, context):
     rec = event["Records"][0]
     in_bucket = rec["s3"]["bucket"]["name"]
-    in_key = rec["s3"]["object"]["key"]
+    in_key = unquote_plus(rec["s3"]["object"]["key"])
 
     base_name = in_key.split("/")[-1].rsplit(".", 1)[0]
     summary_key = f"{SUMMARY_PREFIX}{base_name}.summary.txt"

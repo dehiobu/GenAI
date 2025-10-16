@@ -60,3 +60,15 @@ Notes
 - Replace placeholders (e.g., `<alias>`, `<bucket>`, `<presigned-url>`) with real values.
 - Remember to redeploy the CloudFormation stack after editing IAM permissions in `template.yaml`.
 - `template.yaml` is the authored SAM/CloudFormation template; `aws cloudformation package` produces `packaged.yaml` with artifact S3 URIs; both PowerShell scripts wrap that package/deploy sequence.
+
+File Relationships
+------------------
+- `index.html` — static front-end served from Lightsail; calls the upload/download API Gateway endpoints.
+- `src/upload_presign.py` — Lambda behind `GenerateUploadURL`; returns presigned `PUT` URLs for `genai-in-use1-x7p5f0/incoming/`.
+- `src/download_presign.py` — Lambda for generating presigned `GET` URLs from the output bucket.
+- `src/app.py` — `SummariseTranslateFn` Lambda triggered by S3; reads incoming objects, calls Bedrock & Translate, writes summaries/translations (and errors) to the output bucket.
+- `template.yaml` — SAM/CloudFormation source defining the ingest/output buckets, processing Lambda, and IAM role.
+- `packaged.yaml` — generated template with uploaded artifacts; deployed by CloudFormation.
+- `deploy-genai.ps1` / `deploy-genai2.ps1` — convenience wrappers for packaging/deploying `template.yaml` and managing buckets/stacks.
+- `.github/workflows/deploy.yml` — CI job that uploads `index.html` to Lightsail and refreshes the web host.
+- `.gitignore`, `README`, and other root files — standard repo metadata (not modified during this session).
