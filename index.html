@@ -58,7 +58,10 @@
       setStatus(`Requesting upload URL for ${file.name}...`);
 
       try {
-        const presignRes = await fetch(`${UPLOAD_ENDPOINT}?filename=${encodeURIComponent(file.name)}`);
+        const contentType = file.type || "application/octet-stream";
+        const presignRes = await fetch(
+          `${UPLOAD_ENDPOINT}?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(contentType)}`
+        );
         if (!presignRes.ok) {
           throw new Error(`Failed to get upload URL (${presignRes.status})`);
         }
@@ -79,6 +82,9 @@
 
         const putRes = await fetch(url, {
           method: "PUT",
+          headers: {
+            "Content-Type": contentType,
+          },
           body: file,
         });
 

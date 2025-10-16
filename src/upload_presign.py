@@ -34,18 +34,33 @@ def lambda_handler(event, context):
     if not normalized:
         return _response(400, {"error": "invalid filename"})
 
+    content_type = params.get("contentType")
+    if content_type:
+        content_type = content_type.strip()
+        if not content_type:
+            content_type = None
+
     if not normalized.startswith(UPLOAD_PREFIX):
         key = f"{UPLOAD_PREFIX}{normalized}"
     else:
         key = normalized
 
     try:
+        presign_params = {"Bucket": BUCKET, "Key": key}
+        if content_type:
+            presign_params["ContentType"] = content_type
+
         url = s3.generate_presigned_url(
             "put_object",
-            Params={"Bucket": BUCKET, "Key": key},
+            Params=presign_params,
             ExpiresIn=3600,
+            HttpMethod="PUT",
         )
     except Exception as exc:
         return _response(500, {"error": str(exc)})
 
-    return _response(200, {"url": url, "bucket": BUCKET, "key": key})
+    body: Dict[str, Any] = {"url": url, "bucket": BUCKET, "key": key}
+    if content_type:
+        body["contentType"] = content_type
+
+    return _response(200, body)
