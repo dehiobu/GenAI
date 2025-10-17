@@ -2,16 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>GenAI Upload & Download</title>
+<title>Summary Translator</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 2rem; line-height: 1.4; }
+    body { font-family: Arial, sans-serif; background: #fff; margin: 2rem; line-height: 1.4; }
     section { margin-bottom: 2.5rem; }
     label { display: block; margin-bottom: 0.5rem; }
     input[type="text"] { width: 20rem; padding: 0.4rem; }
     button { margin-top: 0.75rem; margin-right: 0.5rem; padding: 0.5rem 1rem; cursor: pointer; }
-    #status { margin-top: 1.5rem; min-height: 1.2rem; color: #0b5394; }
+    #status { margin-top: 1rem; min-height: 1.2rem; color: #0b5394; }
     #status.error { color: #a61c1c; }
-    .download-grid { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 1rem; }
+    .page-frame { border: 4px solid #ffc107; padding: 2rem; }
+    .download-grid { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 1.5rem; }
     .download-column { flex: 1 1 18rem; }
     .download-column h3 { margin-bottom: 0.5rem; }
     .download-list { list-style: none; padding: 0; margin: 0; border: 1px solid #d9d9d9; border-radius: 6px; max-height: 14rem; overflow-y: auto; }
@@ -22,44 +23,45 @@
     .download-list .meta { color: #666; font-size: 0.85rem; }
     .download-message { padding: 0.6rem 0.75rem; color: #666; font-style: italic; text-align: center; }
     .download-message.error { color: #a61c1c; font-style: normal; }
-    .download-controls { margin-top: 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+    .download-controls { margin-top: 0.75rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
     .download-controls label { display: inline-flex; align-items: center; margin: 0; }
-    .download-controls button { margin-top: 0; }
+    .download-column button { margin-top: 1rem; }
   </style>
 </head>
 <body>
-  <section>
-    <h2>Upload to GenAI</h2>
-    <label for="uploadFile">Choose a text file to process:</label>
-    <input type="file" id="uploadFile" accept=".txt,.md,.docx,.pdf">
-    <div>
-      <button type="button" onclick="uploadToS3()">Upload</button>
-    </div>
-  </section>
-
-  <section>
-    <h2>Download Results</h2>
-    <p>Click a file below to download it, or use the manual option if you already know the original filename.</p>
-    <div class="download-grid">
-      <div class="download-column">
-        <h3>Summaries</h3>
-        <ul id="summaryList" class="download-list"></ul>
+  <div class="page-frame">
+    <section>
+      <h1>Summary Translator</h1>
+      <label for="uploadFile">Choose a text file to process:</label>
+      <input type="file" id="uploadFile" accept=".txt,.md,.docx,.pdf">
+      <div>
+        <button type="button" onclick="uploadToS3()">Upload</button>
       </div>
-      <div class="download-column">
-        <h3>Translations</h3>
-        <ul id="translationList" class="download-list"></ul>
-      </div>
-    </div>
-    <div class="download-controls">
-      <button type="button" onclick="refreshDownloadLists()">Refresh lists</button>
-      <label for="filename">Manual download (original filename, e.g. <em>sample.txt</em>):</label>
-      <input type="text" id="filename" placeholder="Enter filename">
-      <button type="button" onclick="downloadFile('summary')">Download Summary</button>
-      <button type="button" onclick="downloadFile('translation')">Download Translation</button>
-    </div>
-  </section>
+      <div id="status"></div>
+    </section>
 
-  <div id="status"></div>
+    <section>
+      <h2>Download Results</h2>
+      <p>Click a file below to download it, or use the manual option if you already know the original filename.</p>
+      <div class="download-controls">
+        <button type="button" onclick="refreshDownloadLists()">Refresh lists</button>
+        <label for="filename">Manual download (original filename, e.g. <em>sample.txt</em>):</label>
+        <input type="text" id="filename" placeholder="Enter filename">
+      </div>
+      <div class="download-grid">
+        <div class="download-column">
+          <h3>Summaries</h3>
+          <ul id="summaryList" class="download-list"></ul>
+          <button type="button" onclick="downloadFile('summary')">Download Summary</button>
+        </div>
+        <div class="download-column">
+          <h3>Translations</h3>
+          <ul id="translationList" class="download-list"></ul>
+          <button type="button" onclick="downloadFile('translation')">Download Translation</button>
+        </div>
+      </div>
+    </section>
+  </div>
 
   <script>
     const UPLOAD_ENDPOINT = "https://w840oeg9lg.execute-api.us-east-1.amazonaws.com/default/GenerateUploadURL";
@@ -73,6 +75,8 @@
       statusEl.className = isError ? "error" : "";
     }
 
+    // API Gateway wraps Lambda responses differently when proxy integration is used,
+    // so normalize both shapes into a plain object.
     function parseLambdaPayload(payload) {
       if (payload && typeof payload === "object" && typeof payload.body === "string") {
         try {
@@ -131,6 +135,7 @@
       return `${value.toFixed(precision)} ${units[unitIndex]}`;
     }
 
+    // Populate the summary/translation list UI with latest objects.
     function renderDownloadList(kind, files) {
       const listEl = getListElement(kind);
       listEl.innerHTML = "";
@@ -173,6 +178,7 @@
       });
     }
 
+    // Retrieve file metadata for a given folder to hydrate the UI.
     async function fetchDownloadList(kind) {
       const folder = FOLDER_MAP[kind];
       if (!folder) {
@@ -253,7 +259,7 @@
           throw new Error(`Upload failed (${message.trim()})`);
         }
 
-        setStatus(`Upload complete! Stored as s3://${bucket}/${key}`);
+        setStatus(`Upload complete! Stored as ${key}`);
         fileInput.value = "";
         refreshDownloadLists().catch((err) => console.error("Failed to refresh lists after upload", err));
       } catch (err) {
