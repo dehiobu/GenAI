@@ -28,6 +28,7 @@ def _response(status_code: int, payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _list_files(config: Dict[str, str]) -> List[Dict[str, Any]]:
+    """Return files (newest first) for the given prefix; used to populate the UI lists."""
     bucket = config["bucket"]
     prefix = config["prefix"]
 
@@ -77,6 +78,7 @@ def lambda_handler(event, context):
     params = event.get("queryStringParameters") or {}
     filename = params.get("filename")
     folder = params.get("folder")
+    # Allow browsers to request a listing for the summary/translation columns.
     list_requested = str(params.get("list", "")).lower() in {"1", "true", "yes"}
 
     if not folder:
