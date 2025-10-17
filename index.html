@@ -4,37 +4,166 @@
   <meta charset="UTF-8">
 <title>Summary Translator</title>
   <style>
-    body { font-family: Arial, sans-serif; background: #fff; margin: 2rem; line-height: 1.4; }
+    body {
+      font-family: Arial, sans-serif;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(130, 170, 255, 0.25), transparent 55%),
+        radial-gradient(circle at 80% 10%, rgba(255, 214, 102, 0.28), transparent 50%),
+        radial-gradient(circle at 10% 80%, rgba(120, 220, 200, 0.28), transparent 45%),
+        linear-gradient(135deg, #edf1ff 0%, #f4f7ff 45%, #fff 100%);
+      margin: 2rem;
+      line-height: 1.4;
+      min-height: 100vh;
+    }
     section { margin-bottom: 2.5rem; }
     label { display: block; margin-bottom: 0.5rem; }
-    input[type="text"] { width: 20rem; padding: 0.4rem; }
-    button { margin-top: 0.75rem; margin-right: 0.5rem; padding: 0.5rem 1rem; cursor: pointer; }
-    #status { margin-top: 1rem; min-height: 1.2rem; color: #0b5394; }
+    input[type="text"] { width: 20rem; padding: 0.45rem 0.55rem; border-radius: 6px; border: 1px solid #c8ced6; background: #fff; }
+    button { margin-top: 0.75rem; margin-right: 0.5rem; padding: 0.55rem 1.25rem; cursor: pointer; border-radius: 6px; border: 1px solid #0b5394; background: #0b5394; color: #fff; transition: background 0.2s ease; }
+    button:hover { background: #08447a; }
+    #status { margin-top: 0.85rem; min-height: 1.2rem; color: #0b5394; }
     #status.error { color: #a61c1c; }
-    .page-frame { border: 4px solid #ffc107; padding: 2rem; }
-    .download-grid { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 1.5rem; }
-    .download-column { flex: 1 1 18rem; }
-    .download-column h3 { margin-bottom: 0.5rem; }
-    .download-list { list-style: none; padding: 0; margin: 0; border: 1px solid #d9d9d9; border-radius: 6px; max-height: 14rem; overflow-y: auto; }
-    .download-list li { padding: 0.6rem 0.75rem; border-bottom: 1px solid #e9e9e9; display: flex; flex-direction: column; gap: 0.2rem; }
+    .page-frame {
+      position: relative;
+      z-index: 0;
+      border: 4px solid #ffc107;
+      padding: 2.25rem;
+      background: #fff;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06);
+      overflow: hidden;
+    }
+    .page-frame > * {
+      position: relative;
+      z-index: 1;
+    }
+    .page-badge {
+      position: absolute;
+      top: 1.4rem;
+      right: 1.4rem;
+      padding: 0.6rem 1.4rem;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(11, 83, 148, 0.22), rgba(255, 193, 7, 0.3));
+      border: 1px solid rgba(11, 83, 148, 0.45);
+      color: #0b355f;
+      font-size: 1.02rem;
+      letter-spacing: 0.12rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      box-shadow: 0 8px 20px rgba(11, 83, 148, 0.12);
+      text-shadow: 0 1px 2px rgba(255, 255, 255, 0.58);
+      pointer-events: none;
+    }
+    .page-frame::before,
+    .page-frame::after {
+      display: none;
+    }
+    .upload-actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+    .upload-actions input[type="file"] { padding: 0.45rem; border: 1px solid #c8ced6; border-radius: 6px; background: #fff; width: 14rem; }
+    .upload-actions button { margin-top: 0; }
+    .download-grid { display: flex; flex-wrap: wrap; gap: 1.75rem; margin-top: 1.75rem; }
+    .download-column { flex: 1 1 18rem; min-width: 16rem; }
+    .download-column h3 { margin-bottom: 0.6rem; color: #0b5394; }
+    .download-description { margin: -0.35rem 0 0.8rem; color: #666; font-size: 0.85rem; min-height: 1.2rem; }
+    .download-list { list-style: none; padding: 0.5rem 0; margin: 0; border: 1px solid #d9d9d9; border-radius: 8px; max-height: 18rem; overflow-y: auto; background: linear-gradient(180deg, #fff 0%, #f8fbff 100%); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04); }
+    .download-list li { padding: 0.75rem 0.9rem; border-bottom: 1px solid #e5eaf0; display: flex; flex-direction: column; gap: 0.35rem; position: relative; }
     .download-list li:last-child { border-bottom: none; }
-    .download-list button { background: none; border: none; padding: 0; margin: 0; text-align: left; font: inherit; color: #0b5394; cursor: pointer; }
-    .download-list button:hover { text-decoration: underline; }
+    .file-name { font-weight: 600; color: #0b5394; cursor: pointer; }
+    .file-name:hover { text-decoration: underline; }
+    .file-actions { position: absolute; right: 0.75rem; top: 0.75rem; display: flex; gap: 0.35rem; }
+    .delete-btn { background: none; border: none; cursor: pointer; padding: 0.15rem; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+    .delete-btn svg { width: 26px; height: 26px; display: block; }
+    .delete-btn:hover { background: rgba(192, 57, 43, 0.1); }
     .download-list .meta { color: #666; font-size: 0.85rem; }
     .download-message { padding: 0.6rem 0.75rem; color: #666; font-style: italic; text-align: center; }
     .download-message.error { color: #a61c1c; font-style: normal; }
-    .download-controls { margin-top: 0.75rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+    .download-controls { margin-top: 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
     .download-controls label { display: inline-flex; align-items: center; margin: 0; }
-    .download-column button { margin-top: 1rem; }
+    .manual-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .manual-buttons button { margin-top: 0; }
+    .visitor-counter {
+      position: absolute;
+      right: 1.5rem;
+      bottom: 1.5rem;
+      font-size: 0.95rem;
+      color: #334155;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(11, 83, 148, 0.25);
+      border-radius: 999px;
+      padding: 0.35rem 0.9rem;
+      box-shadow: 0 6px 14px rgba(15, 26, 44, 0.12);
+    }
+    .confirm-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 26, 44, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .confirm-dialog {
+      background: #fff;
+      border-radius: 16px;
+      padding: 1.8rem 2.2rem;
+      box-shadow: 0 24px 50px rgba(12, 34, 64, 0.24);
+      max-width: 420px;
+      width: calc(100% - 3rem);
+    }
+    .confirm-dialog h3 {
+      margin: 0 0 0.8rem;
+      font-size: 1.2rem;
+      color: #0b355f;
+    }
+    .confirm-dialog p {
+      margin: 0 0 1.4rem;
+      color: #4b5563;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+    .confirm-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+    .btn-ghost,
+    .btn-danger {
+      border-radius: 999px;
+      padding: 0.5rem 1.2rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+    .btn-ghost {
+      background: #ffffff;
+      border-color: rgba(11, 83, 148, 0.25);
+      color: #0b355f;
+    }
+    .btn-ghost:hover {
+      background: rgba(11, 83, 148, 0.1);
+      box-shadow: 0 6px 16px rgba(11, 83, 148, 0.12);
+    }
+    .btn-danger {
+      background: #d64545;
+      color: #fff;
+      box-shadow: 0 8px 20px rgba(214, 69, 69, 0.25);
+    }
+    .btn-danger:hover {
+      background: #bf3535;
+      box-shadow: 0 10px 24px rgba(191, 53, 53, 0.3);
+      transform: translateY(-1px);
+    }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
   <div class="page-frame">
+    <div class="page-badge">AI-driven Bedrock | Amazon Translate</div>
     <section>
       <h1>Summary Translator</h1>
       <label for="uploadFile">Choose a text file to process:</label>
-      <input type="file" id="uploadFile" accept=".txt,.md,.docx,.pdf">
-      <div>
+      <div class="upload-actions">
+        <input type="file" id="uploadFile" accept=".txt,.md,.docx,.pdf">
         <button type="button" onclick="uploadToS3()">Upload</button>
       </div>
       <div id="status"></div>
@@ -47,27 +176,84 @@
         <button type="button" onclick="refreshDownloadLists()">Refresh lists</button>
         <label for="filename">Manual download (original filename, e.g. <em>sample.txt</em>):</label>
         <input type="text" id="filename" placeholder="Enter filename">
-      </div>
-      <div class="download-grid">
-        <div class="download-column">
-          <h3>Summaries</h3>
-          <ul id="summaryList" class="download-list"></ul>
-          <button type="button" onclick="downloadFile('summary')">Download Summary</button>
-        </div>
-        <div class="download-column">
-          <h3>Translations</h3>
-          <ul id="translationList" class="download-list"></ul>
-          <button type="button" onclick="downloadFile('translation')">Download Translation</button>
+        <div class="manual-buttons">
+          <button type="button" onclick="downloadFile('summary', undefined, true)">Summary</button>
+          <button type="button" onclick="downloadFile('translation', undefined, true)">Translation</button>
+          <button type="button" onclick="downloadFile('error', undefined, true)">Error</button>
         </div>
       </div>
-    </section>
+        <div class="download-grid">
+          <div class="download-column">
+            <h3>Summaries</h3>
+            <div class="download-description">&nbsp;</div>
+            <ul id="summaryList" class="download-list"></ul>
+          </div>
+          <div class="download-column">
+            <h3>Translations</h3>
+            <div class="download-description">&nbsp;</div>
+            <ul id="translationList" class="download-list"></ul>
+          </div>
+          <div class="download-column">
+            <h3>Errors</h3>
+            <div class="download-description">Files that failed downstream processing.</div>
+            <ul id="errorList" class="download-list"></ul>
+          </div>
+        </div>
+      </section>
+      <div class="visitor-counter" id="visitorCounter">Visitors: 0</div>
   </div>
 
-  <script>
-    const UPLOAD_ENDPOINT = "https://w840oeg9lg.execute-api.us-east-1.amazonaws.com/default/GenerateUploadURL";
+  <div id="confirmOverlay" class="confirm-overlay hidden">
+    <div class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <h3 id="confirmTitle">Confirm Delete</h3>
+      <p id="confirmMessage">Are you sure?</p>
+      <div class="confirm-actions">
+        <button type="button" class="btn-ghost" id="confirmCancel">Cancel</button>
+        <button type="button" class="btn-danger" id="confirmOk">Delete</button>
+      </div>
+    </div>
+  </div>
+
+    <script>
+      const UPLOAD_ENDPOINT = "https://w840oeg9lg.execute-api.us-east-1.amazonaws.com/default/GenerateUploadURL";
     const DOWNLOAD_ENDPOINT = "https://r62nxdnlhi.execute-api.us-east-1.amazonaws.com/default/GenerateDownloadURL";
-    const FOLDER_MAP = { summary: "summaries", translation: "translations" };
-    const LIST_IDS = { summary: "summaryList", translation: "translationList" };
+    const FOLDER_MAP = { summary: "summaries", translation: "translations", error: "errors" };
+    const LIST_IDS = { summary: "summaryList", translation: "translationList", error: "errorList" };
+    const confirmOverlay = document.getElementById("confirmOverlay");
+    const confirmMessageEl = document.getElementById("confirmMessage");
+    const confirmOk = document.getElementById("confirmOk");
+    const confirmCancel = document.getElementById("confirmCancel");
+    let confirmResolver = null;
+
+    function showConfirm(message) {
+      return new Promise((resolve) => {
+        confirmResolver = resolve;
+        confirmMessageEl.textContent = message;
+        confirmOverlay.classList.remove("hidden");
+        confirmOk.focus();
+      });
+    }
+
+    function closeConfirm(result) {
+      if (!confirmResolver) return;
+      confirmOverlay.classList.add("hidden");
+      confirmResolver(result);
+      confirmResolver = null;
+    }
+
+    confirmOk.addEventListener("click", () => closeConfirm(true));
+    confirmCancel.addEventListener("click", () => closeConfirm(false));
+    confirmOverlay.addEventListener("click", (evt) => {
+      if (evt.target === confirmOverlay) {
+        closeConfirm(false);
+      }
+    });
+    document.addEventListener("keydown", (evt) => {
+      if (!confirmResolver) return;
+      if (evt.key === "Escape") {
+        closeConfirm(false);
+      }
+    });
 
     function setStatus(message, isError = false) {
       const statusEl = document.getElementById("status");
@@ -151,12 +337,39 @@
       files.forEach((file) => {
         const li = document.createElement("li");
 
-        const button = document.createElement("button");
-        button.type = "button";
+        const header = document.createElement("div");
+        header.className = "file-header";
         const displayName = file?.filename || file?.key || "download";
-        button.textContent = displayName;
-        button.addEventListener("click", () => downloadFile(kind, displayName));
-        li.appendChild(button);
+        const nameEl = document.createElement("span");
+        nameEl.className = "file-name";
+        nameEl.textContent = displayName;
+        nameEl.addEventListener("click", () => downloadFile(kind, displayName));
+        header.appendChild(nameEl);
+        li.appendChild(header);
+
+        const actions = document.createElement("div");
+        actions.className = "file-actions";
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "delete-btn";
+        deleteBtn.setAttribute("aria-label", `Delete ${displayName}`);
+        deleteBtn.innerHTML = `
+          <svg viewBox="0 0 64 64" aria-hidden="true">
+            <rect x="14" y="8" width="28" height="40" rx="3" fill="#ffffff" stroke="#5b6d7b" stroke-width="2"/>
+            <rect x="18" y="16" width="20" height="4" rx="1.5" fill="#c1c9d1"/>
+            <rect x="18" y="24" width="16" height="4" rx="1.5" fill="#c1c9d1"/>
+            <rect x="18" y="32" width="12" height="4" rx="1.5" fill="#c1c9d1"/>
+            <path d="M32 6l8 8h-8z" fill="#d3d9df"/>
+            <circle cx="42" cy="42" r="14" fill="#e74c3c"/>
+            <path d="M36.5 36.5L47.5 47.5M47.5 36.5L36.5 47.5" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+        `;
+        deleteBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          deleteFile(kind, displayName);
+        });
+        actions.appendChild(deleteBtn);
+        li.appendChild(actions);
 
         const metaParts = [];
         const when = formatTimestamp(file?.last_modified);
@@ -210,9 +423,9 @@
       }
     }
 
-    async function refreshDownloadLists() {
-      await Promise.all(["summary", "translation"].map(fetchDownloadList));
-    }
+      async function refreshDownloadLists() {
+        await Promise.all(["summary", "translation", "error"].map(fetchDownloadList));
+      }
 
     async function uploadToS3() {
       const fileInput = document.getElementById("uploadFile");
@@ -267,7 +480,38 @@
       }
     }
 
-    async function downloadFile(kind, overrideFilename) {
+    async function requestDownloadUrl(kind, filename) {
+      const folder = FOLDER_MAP[kind];
+      if (!folder) {
+        throw new Error(`Unknown download type '${kind}'.`);
+      }
+
+      const res = await fetch(
+        `${DOWNLOAD_ENDPOINT}?folder=${encodeURIComponent(folder)}&filename=${encodeURIComponent(filename)}`
+      );
+
+      if (!res.ok) {
+        if (res.status === 404) {
+          throw new Error("File not found. Check the filename and try again.");
+        }
+        throw new Error(`Failed to get download URL (${res.status})`);
+      }
+
+      const payload = await res.json();
+      const data = parseLambdaPayload(payload);
+
+      const { url, error } = data;
+      if (error) {
+        throw new Error(error);
+      }
+      if (!url) {
+        throw new Error("Download URL missing from response.");
+      }
+
+      return url;
+    }
+
+    async function downloadFile(kind, overrideFilename, forceDownload = false) {
       const folder = FOLDER_MAP[kind];
       if (!folder) {
         setStatus(`Unknown download type '${kind}'.`, true);
@@ -288,29 +532,61 @@
       setStatus(`Requesting ${kind} download link for ${filename}...`);
 
       try {
-        const res = await fetch(
-          `${DOWNLOAD_ENDPOINT}?folder=${encodeURIComponent(folder)}&filename=${encodeURIComponent(filename)}`
-        );
-
-        if (!res.ok) {
-          throw new Error(`Failed to get download URL (${res.status})`);
+        const url = await requestDownloadUrl(kind, filename);
+        if (forceDownload) {
+          const res = await fetch(url);
+          if (!res.ok) {
+            if (res.status === 404) {
+              throw new Error("File not found. Check the filename and try again.");
+            }
+            throw new Error(`Failed to download file (${res.status})`);
+          }
+          const blob = await res.blob();
+          const downloadUrl = URL.createObjectURL(blob);
+          const anchor = document.createElement("a");
+          anchor.href = downloadUrl;
+          anchor.download = filename;
+          document.body.appendChild(anchor);
+          anchor.click();
+          anchor.remove();
+          URL.revokeObjectURL(downloadUrl);
+          setStatus(`Downloaded ${filename}.`);
+        } else {
+          window.open(url, "_blank", "noopener");
+          setStatus("Download link opened in a new tab.");
         }
-
-        const payload = await res.json();
-        const data = parseLambdaPayload(payload);
-
-        const { url, error } = data;
-        if (error) {
-          throw new Error(error);
-        }
-        if (!url) {
-          throw new Error("Download URL missing from response.");
-        }
-
-        window.open(url, "_blank", "noopener");
-        setStatus("Download link opened in a new tab.");
       } catch (err) {
         setStatus(err.message || "Download failed.", true);
+      }
+    }
+
+    async function deleteFile(kind, filename) {
+      const folder = FOLDER_MAP[kind];
+      if (!folder) {
+        setStatus(`Unknown delete type '${kind}'.`, true);
+        return;
+      }
+
+      const confirmed = await showConfirm(`Delete ${filename}? This cannot be undone.`);
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        setStatus(`Deleting ${filename}...`);
+        const res = await fetch(
+          `${DOWNLOAD_ENDPOINT}?folder=${encodeURIComponent(folder)}&filename=${encodeURIComponent(filename)}`,
+          { method: "DELETE" }
+        );
+        if (!res.ok) {
+          const data = parseLambdaPayload(await res.json().catch(() => ({})));
+          const message = data.error || (res.status === 404 ? "File not found." : `Delete failed (${res.status})`);
+          throw new Error(message);
+        }
+        setStatus(`Deleted ${filename}.`);
+        refreshDownloadLists().catch((err) => console.error("Failed to refresh lists after delete", err));
+      } catch (err) {
+        setStatus(err.message || "Delete failed.", true);
       }
     }
 
@@ -319,6 +595,19 @@
         console.error(err);
         setStatus("Unable to load file lists right now.", true);
       });
+
+      try {
+        const counterEl = document.getElementById("visitorCounter");
+        if (counterEl) {
+          const key = "summary-translator-visitor-count";
+          const current = Number(localStorage.getItem(key) || "0");
+          const next = current + 1;
+          localStorage.setItem(key, String(next));
+          counterEl.textContent = `Visitors: ${next.toLocaleString()}`;
+        }
+      } catch (err) {
+        console.warn("Visitor counter unavailable", err);
+      }
     });
   </script>
 </body>

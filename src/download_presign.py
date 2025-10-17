@@ -9,11 +9,12 @@ REGION = "us-east-1"
 FOLDER_CONFIG = {
     "summaries": {"bucket": "genai-out-use1-x7p5f0", "prefix": "summaries/"},
     "translations": {"bucket": "genai-out-use1-x7p5f0", "prefix": "translations/"},
+    "errors": {"bucket": "genai-out-use1-x7p5f0", "prefix": "errors/"},
 }
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "*",
-    "Access-Control-Allow-Methods": "GET,OPTIONS",
+    "Access-Control-Allow-Methods": "GET,OPTIONS,DELETE",
 }
 
 s3 = boto3.client("s3", region_name=REGION)
@@ -71,8 +72,29 @@ def _list_files(config: Dict[str, str]) -> List[Dict[str, Any]]:
     return [entry[1] for entry in entries]
 
 
+def _sanitize_filename(filename: str) -> str:
+    sanitized = filename.lstrip("/")
+    if not sanitized:
+        raise ValueError("Invalid filename")
+
+    parts = sanitized.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ValueError("Invalid filename")
+
+    return sanitized
+
+
+def _get_method(event: Dict[str, Any]) -> str:
+    method = event.get("httpMethod")
+    if not method:
+        method = event.get("requestContext", {}).get("http", {}).get("method")
+    return (method or "GET").upper()
+
+
 def lambda_handler(event, context):
-    if event.get("httpMethod") == "OPTIONS":
+    method = _get_method(event)
+
+    if method == "OPTIONS":
         return _response(200, {"message": "ok"})
 
     params = event.get("queryStringParameters") or {}
@@ -95,16 +117,36 @@ def lambda_handler(event, context):
             return _response(500, {"error": str(exc)})
         return _response(200, {"files": files})
 
+    if method == "DELETE":
+        if not filename:
+            return _response(400, {"error": "Missing filename"})
+        try:
+            sanitized = _sanitize_filename(filename)
+        except ValueError as exc:
+            return _response(400, {"error": str(exc)})
+
+        prefix = config["prefix"]
+        key = sanitized if sanitized.startswith(prefix) else f"{prefix}{sanitized}"
+
+        try:
+            s3.delete_object(Bucket=config["bucket"], Key=key)
+        except s3.exceptions.NoSuchKey:
+            return _response(404, {"error": "File not found"})
+        except Exception as exc:
+            return _response(500, {"error": str(exc)})
+
+        return _response(200, {"deleted": key})
+
+    if method != "GET":
+        return _response(405, {"error": "Unsupported method"})
+
     if not filename:
         return _response(400, {"error": "Missing filename"})
 
-    sanitized = filename.lstrip("/")
-    if not sanitized:
-        return _response(400, {"error": "Invalid filename"})
-
-    parts = sanitized.split("/")
-    if any(part in {"", ".", ".."} for part in parts):
-        return _response(400, {"error": "Invalid filename"})
+    try:
+        sanitized = _sanitize_filename(filename)
+    except ValueError as exc:
+        return _response(400, {"error": str(exc)})
 
     prefix = config["prefix"]
     if sanitized.startswith(prefix):
