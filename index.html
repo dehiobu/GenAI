@@ -2,43 +2,467 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>GenAI Upload & Download</title>
+<title>Summary Translator</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 2rem; line-height: 1.4; }
+    body {
+      font-family: Arial, sans-serif;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(130, 170, 255, 0.25), transparent 55%),
+        radial-gradient(circle at 80% 10%, rgba(255, 214, 102, 0.28), transparent 50%),
+        radial-gradient(circle at 10% 80%, rgba(120, 220, 200, 0.28), transparent 45%),
+        linear-gradient(135deg, #edf1ff 0%, #f4f7ff 45%, #fff 100%);
+      margin: 2rem;
+      line-height: 1.4;
+      min-height: 100vh;
+    }
     section { margin-bottom: 2.5rem; }
     label { display: block; margin-bottom: 0.5rem; }
-    input[type="text"] { width: 20rem; padding: 0.4rem; }
-    button { margin-top: 0.75rem; margin-right: 0.5rem; padding: 0.5rem 1rem; cursor: pointer; }
-    #status { margin-top: 1.5rem; min-height: 1.2rem; color: #0b5394; }
+    input[type="text"] { width: 20rem; padding: 0.45rem 0.55rem; border-radius: 6px; border: 1px solid #c8ced6; background: #fff; }
+    button { margin-top: 0.75rem; margin-right: 0.5rem; padding: 0.55rem 1.25rem; cursor: pointer; border-radius: 6px; border: 1px solid #0b5394; background: #0b5394; color: #fff; transition: background 0.2s ease; }
+    button:hover { background: #08447a; }
+    #status { margin-top: 0.85rem; min-height: 1.2rem; color: #0b5394; }
     #status.error { color: #a61c1c; }
+    .page-frame {
+      position: relative;
+      z-index: 0;
+      border: 4px solid #ffc107;
+      padding: 2.25rem;
+      background: #fff;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06);
+      overflow: hidden;
+    }
+    .page-frame > * {
+      position: relative;
+      z-index: 1;
+    }
+    .page-badge {
+      position: absolute;
+      top: 1.4rem;
+      right: 1.4rem;
+      padding: 0.6rem 1.4rem;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(11, 83, 148, 0.22), rgba(255, 193, 7, 0.3));
+      border: 1px solid rgba(11, 83, 148, 0.45);
+      color: #0b355f;
+      font-size: 1.02rem;
+      letter-spacing: 0.12rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      box-shadow: 0 8px 20px rgba(11, 83, 148, 0.12);
+      text-shadow: 0 1px 2px rgba(255, 255, 255, 0.58);
+      pointer-events: none;
+    }
+    .page-frame::before,
+    .page-frame::after {
+      display: none;
+    }
+    .upload-actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+    .upload-actions input[type="file"] { padding: 0.45rem; border: 1px solid #c8ced6; border-radius: 6px; background: #fff; width: 14rem; }
+    .upload-actions button { margin-top: 0; }
+    .language-select { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap; }
+    .language-select label { font-weight: 600; color: #2a3744; }
+    .language-select select { min-width: 16rem; padding: 0.4rem 0.6rem; border: 1px solid #c8ced6; border-radius: 6px; background-color: #fff; color: #1f2b38; }
+    .download-grid { display: flex; flex-wrap: wrap; gap: 1.75rem; margin-top: 1.75rem; }
+    .download-column { flex: 1 1 18rem; min-width: 16rem; }
+    .download-column h3 { margin-bottom: 0.6rem; color: #0b5394; }
+    .download-description { margin: -0.35rem 0 0.8rem; color: #666; font-size: 0.85rem; min-height: 1.2rem; }
+    .download-list { list-style: none; padding: 0.5rem 0; margin: 0; border: 1px solid #d9d9d9; border-radius: 8px; max-height: 18rem; overflow-y: auto; background: linear-gradient(180deg, #fff 0%, #f8fbff 100%); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04); }
+    .download-list li { padding: 0.75rem 0.9rem; border-bottom: 1px solid #e5eaf0; display: flex; flex-direction: column; gap: 0.35rem; position: relative; }
+    .download-list li:last-child { border-bottom: none; }
+    .file-name { font-weight: 600; color: #0b5394; cursor: pointer; }
+    .file-name:hover { text-decoration: underline; }
+    .file-actions { position: absolute; right: 0.75rem; top: 0.75rem; display: flex; gap: 0.35rem; }
+    .delete-btn { background: none; border: none; cursor: pointer; padding: 0.15rem; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+    .delete-btn svg { width: 26px; height: 26px; display: block; }
+    .delete-btn:hover { background: rgba(192, 57, 43, 0.1); }
+    .download-list .meta { color: #666; font-size: 0.85rem; }
+    .download-message { padding: 0.6rem 0.75rem; color: #666; font-style: italic; text-align: center; }
+    .download-message.error { color: #a61c1c; font-style: normal; }
+    .download-controls { margin-top: 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+    .download-controls label { display: inline-flex; align-items: center; margin: 0; }
+    .manual-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .manual-buttons button { margin-top: 0; }
+    .help-button {
+      position: absolute;
+      top: 1.4rem;
+      left: 1.35rem;
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(11, 83, 148, 0.22), rgba(255, 193, 7, 0.3));
+      border: 1px solid rgba(11, 83, 148, 0.45);
+      color: #0b355f;
+      font-size: 0.95rem;
+      letter-spacing: 0.16rem;
+      text-transform: uppercase;
+      padding: 0.55rem 1.45rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(11, 83, 148, 0.18);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .help-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 26px rgba(11, 83, 148, 0.24);
+    }
+    .help-button:focus {
+      outline: 3px solid rgba(11, 83, 148, 0.35);
+      outline-offset: 2px;
+    }
+    .page-title {
+      margin-top: 3.4rem;
+    }
+    .visitor-counter {
+      position: absolute;
+      right: 1.5rem;
+      bottom: 1.5rem;
+      font-size: 0.95rem;
+      color: #334155;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(11, 83, 148, 0.25);
+      border-radius: 999px;
+      padding: 0.35rem 0.9rem;
+      box-shadow: 0 6px 14px rgba(15, 26, 44, 0.12);
+    }
+    .help-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 26, 44, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 900;
+    }
+    .help-dialog {
+      background: #fff;
+      border-radius: 18px;
+      padding: 2.2rem;
+      width: min(600px, calc(100% - 3rem));
+      max-height: calc(100% - 4rem);
+      overflow-y: auto;
+      box-shadow: 0 24px 48px rgba(12, 34, 64, 0.28);
+    }
+    .help-dialog h2 {
+      margin: 0 0 1rem;
+      font-size: 1.45rem;
+      color: #0b355f;
+    }
+    .help-dialog ol {
+      padding-left: 1.4rem;
+      color: #4b5563;
+      line-height: 1.55;
+    }
+    .help-dialog li {
+      margin-bottom: 0.9rem;
+    }
+    .help-close {
+      margin-top: 1.2rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5rem 1.2rem;
+      border-radius: 999px;
+      border: 1px solid rgba(11, 83, 148, 0.25);
+      background: rgba(11, 83, 148, 0.08);
+      color: #0b355f;
+      font-weight: 600;
+      cursor: pointer;
+      transition: box-shadow 0.15s ease;
+    }
+    .help-close:hover {
+      box-shadow: 0 8px 18px rgba(11, 83, 148, 0.18);
+    }
+    .confirm-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 26, 44, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .confirm-dialog {
+      background: #fff;
+      border-radius: 16px;
+      padding: 1.8rem 2.2rem;
+      box-shadow: 0 24px 50px rgba(12, 34, 64, 0.24);
+      max-width: 420px;
+      width: calc(100% - 3rem);
+    }
+    .confirm-dialog h3 {
+      margin: 0 0 0.8rem;
+      font-size: 1.2rem;
+      color: #0b355f;
+    }
+    .confirm-dialog p {
+      margin: 0 0 1.4rem;
+      color: #4b5563;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+    .confirm-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+    .btn-ghost,
+    .btn-danger {
+      border-radius: 999px;
+      padding: 0.5rem 1.2rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+    .btn-ghost {
+      background: #ffffff;
+      border-color: rgba(11, 83, 148, 0.25);
+      color: #0b355f;
+    }
+    .btn-ghost:hover {
+      background: rgba(11, 83, 148, 0.1);
+      box-shadow: 0 6px 16px rgba(11, 83, 148, 0.12);
+    }
+    .btn-danger {
+      background: #d64545;
+      color: #fff;
+      box-shadow: 0 8px 20px rgba(214, 69, 69, 0.25);
+    }
+    .btn-danger:hover {
+      background: #bf3535;
+      box-shadow: 0 10px 24px rgba(191, 53, 53, 0.3);
+      transform: translateY(-1px);
+    }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
-  <section>
-    <h2>Upload to GenAI</h2>
-    <label for="uploadFile">Choose a text file to process:</label>
-    <input type="file" id="uploadFile" accept=".txt,.md,.docx,.pdf">
-    <div>
-      <button type="button" onclick="uploadToS3()">Upload</button>
+  <div class="page-frame">
+    <button type="button" class="help-button" id="helpButton" aria-haspopup="dialog" aria-controls="helpOverlay" title="How to use">How to Use</button>
+    <div class="page-badge">AI-driven Bedrock | Amazon Translate</div>
+    <section>
+      <h1 class="page-title">Summary Translator</h1>
+      <label for="uploadFile">Choose a text file to process:</label>
+      <div class="upload-actions">
+        <input type="file" id="uploadFile" accept=".txt,.md,.docx,.pdf">
+        <button type="button" onclick="uploadToS3()">Upload</button>
+      </div>
+      <div id="languageSelector" class="language-select hidden">
+        <label for="targetLanguage">Translate to:</label>
+        <select id="targetLanguage" disabled>
+          <option value="" disabled selected>Select target language</option>
+        </select>
+      </div>
+      <div id="status"></div>
+    </section>
+
+    <section>
+      <h2>Download Results</h2>
+      <p>Click a file below to download it, or use the manual option if you already know the original filename.</p>
+      <div class="download-controls">
+        <button type="button" onclick="refreshDownloadLists()">Refresh lists</button>
+        <label for="filename">Manual download (original filename, e.g. <em>sample.txt</em>):</label>
+        <input type="text" id="filename" placeholder="Enter filename">
+        <div class="manual-buttons">
+          <button type="button" onclick="downloadFile('summary', undefined, true)">Summary</button>
+          <button type="button" onclick="downloadFile('translation', undefined, true)">Translation</button>
+          <button type="button" onclick="downloadFile('error', undefined, true)">Error</button>
+        </div>
+      </div>
+        <div class="download-grid">
+          <div class="download-column">
+            <h3>Summaries</h3>
+            <div class="download-description">&nbsp;</div>
+            <ul id="summaryList" class="download-list"></ul>
+          </div>
+          <div class="download-column">
+            <h3>Translations</h3>
+            <div class="download-description">&nbsp;</div>
+            <ul id="translationList" class="download-list"></ul>
+          </div>
+          <div class="download-column">
+            <h3>Errors</h3>
+            <div class="download-description">Files that failed downstream processing.</div>
+            <ul id="errorList" class="download-list"></ul>
+          </div>
+        </div>
+      </section>
+      <div class="visitor-counter" id="visitorCounter">Visitors: 0</div>
+  </div>
+
+  <div id="helpOverlay" class="help-overlay hidden">
+    <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <h2 id="helpTitle">How to Use Summary Translator</h2>
+      <ol>
+        <li><strong>Upload a document:</strong> click <em>Browse...</em>, pick your file, choose a target language from the dropdown that appears, then press <em>Upload</em>. Wait for the "Upload complete" status.</li>
+        <li><strong>Refresh the lists:</strong> tap <em>Refresh lists</em> to load new summaries, translations, or error messages.</li>
+        <li><strong>Open or download:</strong> click any filename to view it in a new tab, or use the manual buttons to download directly.</li>
+        <li><strong>Remove unwanted files:</strong> use the red delete icon. Confirm when prompted—deletes cannot be undone.</li>
+        <li><strong>Run again:</strong> upload an updated source file at any time. Each run creates a fresh set of artefacts.</li>
+      </ol>
+      <button type="button" class="help-close" id="helpClose">Close</button>
     </div>
-  </section>
+  </div>
 
-  <section>
-    <h2>Download Results</h2>
-    <label for="filename">Source filename (e.g. <em>sample.txt</em>):</label>
-    <input type="text" id="filename" placeholder="Enter filename">
-    <div>
-      <button type="button" onclick="downloadFile('summary')">Download Summary</button>
-      <button type="button" onclick="downloadFile('translation')">Download Translation</button>
+  <div id="confirmOverlay" class="confirm-overlay hidden">
+    <div class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <h3 id="confirmTitle">Confirm Delete</h3>
+      <p id="confirmMessage">Are you sure?</p>
+      <div class="confirm-actions">
+        <button type="button" class="btn-ghost" id="confirmCancel">Cancel</button>
+        <button type="button" class="btn-danger" id="confirmOk">Delete</button>
+      </div>
     </div>
-  </section>
+  </div>
 
-  <div id="status"></div>
-
-  <script>
-    const UPLOAD_ENDPOINT = "https://w840oeg9lg.execute-api.us-east-1.amazonaws.com/default/GenerateUploadURL";
+    <script>
+      const UPLOAD_ENDPOINT = "https://w840oeg9lg.execute-api.us-east-1.amazonaws.com/default/GenerateUploadURL";
     const DOWNLOAD_ENDPOINT = "https://r62nxdnlhi.execute-api.us-east-1.amazonaws.com/default/GenerateDownloadURL";
-    const FOLDER_MAP = { summary: "summaries", translation: "translations" };
+    const FOLDER_MAP = { summary: "summaries", translation: "translations", error: "errors" };
+    const LIST_IDS = { summary: "summaryList", translation: "translationList", error: "errorList" };
+    const LANGUAGE_OPTIONS = [
+      { value: "af", label: "Afrikaans" },
+      { value: "sq", label: "Albanian" },
+      { value: "am", label: "Amharic" },
+      { value: "ar", label: "Arabic" },
+      { value: "hy", label: "Armenian" },
+      { value: "az", label: "Azerbaijani" },
+      { value: "bn", label: "Bengali" },
+      { value: "bs", label: "Bosnian" },
+      { value: "bg", label: "Bulgarian" },
+      { value: "ca", label: "Catalan" },
+      { value: "zh", label: "Chinese (Simplified)" },
+      { value: "zh-TW", label: "Chinese (Traditional)" },
+      { value: "hr", label: "Croatian" },
+      { value: "cs", label: "Czech" },
+      { value: "da", label: "Danish" },
+      { value: "fa-AF", label: "Dari" },
+      { value: "nl", label: "Dutch" },
+      { value: "en", label: "English" },
+      { value: "et", label: "Estonian" },
+      { value: "fa", label: "Farsi (Persian)" },
+      { value: "tl", label: "Filipino (Tagalog)" },
+      { value: "fi", label: "Finnish" },
+      { value: "fr", label: "French" },
+      { value: "fr-CA", label: "French (Canada)" },
+      { value: "ka", label: "Georgian" },
+      { value: "de", label: "German" },
+      { value: "el", label: "Greek" },
+      { value: "gu", label: "Gujarati" },
+      { value: "ht", label: "Haitian Creole" },
+      { value: "ha", label: "Hausa" },
+      { value: "he", label: "Hebrew" },
+      { value: "hi", label: "Hindi" },
+      { value: "hu", label: "Hungarian" },
+      { value: "is", label: "Icelandic" },
+      { value: "id", label: "Indonesian" },
+      { value: "ga", label: "Irish" },
+      { value: "it", label: "Italian" },
+      { value: "ja", label: "Japanese" },
+      { value: "kn", label: "Kannada" },
+      { value: "kk", label: "Kazakh" },
+      { value: "ko", label: "Korean" },
+      { value: "lv", label: "Latvian" },
+      { value: "lt", label: "Lithuanian" },
+      { value: "mk", label: "Macedonian" },
+      { value: "ms", label: "Malay" },
+      { value: "ml", label: "Malayalam" },
+      { value: "mt", label: "Maltese" },
+      { value: "mr", label: "Marathi" },
+      { value: "mn", label: "Mongolian" },
+      { value: "no", label: "Norwegian" },
+      { value: "ps", label: "Pashto" },
+      { value: "pl", label: "Polish" },
+      { value: "pt", label: "Portuguese" },
+      { value: "pt-PT", label: "Portuguese (Portugal)" },
+      { value: "pa", label: "Punjabi" },
+      { value: "ro", label: "Romanian" },
+      { value: "ru", label: "Russian" },
+      { value: "sr", label: "Serbian" },
+      { value: "si", label: "Sinhala" },
+      { value: "sk", label: "Slovak" },
+      { value: "sl", label: "Slovenian" },
+      { value: "so", label: "Somali" },
+      { value: "es", label: "Spanish" },
+      { value: "es-MX", label: "Spanish (Mexico)" },
+      { value: "sw", label: "Swahili" },
+      { value: "sv", label: "Swedish" },
+      { value: "ta", label: "Tamil" },
+      { value: "te", label: "Telugu" },
+      { value: "th", label: "Thai" },
+      { value: "tr", label: "Turkish" },
+      { value: "uk", label: "Ukrainian" },
+      { value: "ur", label: "Urdu" },
+      { value: "uz", label: "Uzbek" },
+      { value: "vi", label: "Vietnamese" },
+      { value: "cy", label: "Welsh" }
+    ];
+    const helpButton = document.getElementById("helpButton");
+    const helpOverlay = document.getElementById("helpOverlay");
+    const helpClose = document.getElementById("helpClose");
+    const confirmOverlay = document.getElementById("confirmOverlay");
+    const confirmMessageEl = document.getElementById("confirmMessage");
+    const confirmOk = document.getElementById("confirmOk");
+    const confirmCancel = document.getElementById("confirmCancel");
+    const languageSelector = document.getElementById("languageSelector");
+    const languageSelect = document.getElementById("targetLanguage");
+    const uploadFileInput = document.getElementById("uploadFile");
+    let confirmResolver = null;
+
+    function openHelp() {
+      if (!helpOverlay) return;
+      helpOverlay.classList.remove("hidden");
+      helpOverlay.focus?.();
+      helpClose?.focus();
+    }
+
+    function closeHelp() {
+      if (!helpOverlay || helpOverlay.classList.contains("hidden")) return;
+      helpOverlay.classList.add("hidden");
+      helpButton?.focus();
+    }
+
+    helpButton?.addEventListener("click", openHelp);
+    helpClose?.addEventListener("click", closeHelp);
+    helpOverlay?.addEventListener("click", (evt) => {
+      if (evt.target === helpOverlay && !helpOverlay.classList.contains("hidden")) {
+        closeHelp();
+      }
+    });
+    document.addEventListener("keydown", (evt) => {
+      if (evt.key === "Escape" && helpOverlay && !helpOverlay.classList.contains("hidden")) {
+        closeHelp();
+      }
+    });
+
+    function showConfirm(message) {
+      return new Promise((resolve) => {
+        confirmResolver = resolve;
+        confirmMessageEl.textContent = message;
+        confirmOverlay.classList.remove("hidden");
+        confirmOk.focus();
+      });
+    }
+
+    function closeConfirm(result) {
+      if (!confirmResolver) return;
+      confirmOverlay.classList.add("hidden");
+      confirmResolver(result);
+      confirmResolver = null;
+    }
+
+    confirmOk.addEventListener("click", () => closeConfirm(true));
+    confirmCancel.addEventListener("click", () => closeConfirm(false));
+    confirmOverlay.addEventListener("click", (evt) => {
+      if (evt.target === confirmOverlay) {
+        closeConfirm(false);
+      }
+    });
+    document.addEventListener("keydown", (evt) => {
+      if (!confirmResolver) return;
+      if (evt.key === "Escape") {
+        closeConfirm(false);
+      }
+    });
 
     function setStatus(message, isError = false) {
       const statusEl = document.getElementById("status");
@@ -46,31 +470,263 @@
       statusEl.className = isError ? "error" : "";
     }
 
+    function populateLanguageSelect() {
+      if (!languageSelect) {
+        return;
+      }
+
+      languageSelect.innerHTML = "";
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "Select target language";
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      languageSelect.appendChild(placeholder);
+
+      LANGUAGE_OPTIONS.forEach(({ value, label }) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = `${label} (${value})`;
+        languageSelect.appendChild(option);
+      });
+
+      languageSelect.disabled = true;
+    }
+
+    function resetLanguageSelection() {
+      if (languageSelector) {
+        languageSelector.classList.add("hidden");
+      }
+      if (languageSelect) {
+        languageSelect.value = "";
+        languageSelect.disabled = true;
+      }
+    }
+
+    function handleFileSelection(evt) {
+      const hasFile = Boolean(evt?.target?.files?.length);
+      if (!hasFile) {
+        resetLanguageSelection();
+        return;
+      }
+
+      if (languageSelector) {
+        languageSelector.classList.remove("hidden");
+      }
+      if (languageSelect) {
+        languageSelect.disabled = false;
+        languageSelect.focus();
+      }
+    }
+
+    // API Gateway wraps Lambda responses differently when proxy integration is used,
+    // so normalize both shapes into a plain object.
+    function parseLambdaPayload(payload) {
+      if (payload && typeof payload === "object" && typeof payload.body === "string") {
+        try {
+          return JSON.parse(payload.body);
+        } catch (err) {
+          console.error("Failed to parse Lambda response body", err);
+          return {};
+        }
+      }
+      return payload || {};
+    }
+
+    function getListElement(kind) {
+      const id = LIST_IDS[kind];
+      if (!id) {
+        throw new Error(`Unknown list kind '${kind}'`);
+      }
+      return document.getElementById(id);
+    }
+
+    function setListMessage(kind, message, type = "info") {
+      const listEl = getListElement(kind);
+      listEl.innerHTML = "";
+      const li = document.createElement("li");
+      li.className = `download-message ${type}`;
+      li.textContent = message;
+      listEl.appendChild(li);
+    }
+
+    function formatTimestamp(iso) {
+      if (!iso) {
+        return "";
+      }
+      const date = new Date(iso);
+      if (Number.isNaN(date.getTime())) {
+        return "";
+      }
+      return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+    }
+
+    function formatSize(bytes) {
+      if (typeof bytes !== "number" || Number.isNaN(bytes)) {
+        return "";
+      }
+      if (bytes === 0) {
+        return "0 B";
+      }
+      const units = ["B", "KB", "MB", "GB", "TB"];
+      let value = bytes;
+      let unitIndex = 0;
+      while (value >= 1024 && unitIndex < units.length - 1) {
+        value /= 1024;
+        unitIndex += 1;
+      }
+      const precision = unitIndex === 0 ? 0 : value < 10 ? 1 : 0;
+      return `${value.toFixed(precision)} ${units[unitIndex]}`;
+    }
+
+    // Populate the summary/translation list UI with latest objects.
+    function renderDownloadList(kind, files) {
+      const listEl = getListElement(kind);
+      listEl.innerHTML = "";
+
+      if (!Array.isArray(files) || files.length === 0) {
+        const li = document.createElement("li");
+        li.className = "download-message empty";
+        li.textContent = "No files yet.";
+        listEl.appendChild(li);
+        return;
+      }
+
+      files.forEach((file) => {
+        const li = document.createElement("li");
+
+        const header = document.createElement("div");
+        header.className = "file-header";
+        const objectPath = file?.filename || file?.key || "download";
+        let displayName = file?.display || objectPath;
+        let languageCode = file?.language || null;
+        if (!file?.display && kind === "translation" && objectPath.includes("/")) {
+          const [maybeLang, remainder] = objectPath.split("/", 2);
+          if (maybeLang && remainder) {
+            languageCode = languageCode || maybeLang;
+            displayName = remainder;
+          }
+        }
+        const nameEl = document.createElement("span");
+        nameEl.className = "file-name";
+        nameEl.textContent = displayName;
+        nameEl.title = objectPath;
+        nameEl.addEventListener("click", () => downloadFile(kind, objectPath));
+        header.appendChild(nameEl);
+        li.appendChild(header);
+
+        const actions = document.createElement("div");
+        actions.className = "file-actions";
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "delete-btn";
+        deleteBtn.setAttribute("aria-label", `Delete ${displayName}`);
+        deleteBtn.innerHTML = `
+          <svg viewBox="0 0 64 64" aria-hidden="true">
+            <rect x="14" y="8" width="28" height="40" rx="3" fill="#ffffff" stroke="#5b6d7b" stroke-width="2"/>
+            <rect x="18" y="16" width="20" height="4" rx="1.5" fill="#c1c9d1"/>
+            <rect x="18" y="24" width="16" height="4" rx="1.5" fill="#c1c9d1"/>
+            <rect x="18" y="32" width="12" height="4" rx="1.5" fill="#c1c9d1"/>
+            <path d="M32 6l8 8h-8z" fill="#d3d9df"/>
+            <circle cx="42" cy="42" r="14" fill="#e74c3c"/>
+            <path d="M36.5 36.5L47.5 47.5M47.5 36.5L36.5 47.5" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+        `;
+        deleteBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          deleteFile(kind, objectPath);
+        });
+        actions.appendChild(deleteBtn);
+        li.appendChild(actions);
+
+        const metaParts = [];
+        if (languageCode) {
+          metaParts.push(`Lang ${languageCode.toUpperCase()}`);
+        }
+        const when = formatTimestamp(file?.last_modified);
+        if (when) {
+          metaParts.push(when);
+        }
+        const sizeLabel = formatSize(file?.size);
+        if (sizeLabel) {
+          metaParts.push(sizeLabel);
+        }
+        if (metaParts.length) {
+          const meta = document.createElement("span");
+          meta.className = "meta";
+          meta.textContent = metaParts.join(" • ");
+          li.appendChild(meta);
+        }
+
+        listEl.appendChild(li);
+      });
+    }
+
+    // Retrieve file metadata for a given folder to hydrate the UI.
+    async function fetchDownloadList(kind) {
+      const folder = FOLDER_MAP[kind];
+      if (!folder) {
+        return;
+      }
+
+      setListMessage(kind, "Loading…", "loading");
+
+      try {
+        const res = await fetch(
+          `${DOWNLOAD_ENDPOINT}?folder=${encodeURIComponent(folder)}&list=true`
+        );
+
+        if (!res.ok) {
+          throw new Error(`Failed to load ${kind} files (${res.status})`);
+        }
+
+        const payload = await res.json();
+        const data = parseLambdaPayload(payload);
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        renderDownloadList(kind, data.files || []);
+      } catch (err) {
+        console.error(err);
+        setListMessage(kind, err.message || `Unable to load ${kind} files.`, "error");
+      }
+    }
+
+      async function refreshDownloadLists() {
+        await Promise.all(["summary", "translation", "error"].map(fetchDownloadList));
+      }
+
     async function uploadToS3() {
-      const fileInput = document.getElementById("uploadFile");
-      const file = fileInput.files[0];
+      const fileInput = uploadFileInput;
+      const file = fileInput?.files?.[0];
 
       if (!file) {
         setStatus("Select a file before uploading.", true);
         return;
       }
 
-      setStatus(`Requesting upload URL for ${file.name}...`);
+      const targetLanguage = (languageSelect?.value || "").trim();
+      if (!targetLanguage) {
+        setStatus("Select a target language before uploading.", true);
+        languageSelect?.focus();
+        return;
+      }
+
+      setStatus(`Requesting upload URL for ${file.name} (target: ${targetLanguage})...`);
 
       try {
         const contentType = file.type || "application/octet-stream";
         const presignRes = await fetch(
-          `${UPLOAD_ENDPOINT}?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(contentType)}`
+          `${UPLOAD_ENDPOINT}?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(contentType)}&lang=${encodeURIComponent(targetLanguage)}`
         );
         if (!presignRes.ok) {
           throw new Error(`Failed to get upload URL (${presignRes.status})`);
         }
 
         const payload = await presignRes.json();
-        const data =
-          typeof payload.body === "string" && !payload.url
-            ? JSON.parse(payload.body)
-            : payload;
+        const data = parseLambdaPayload(payload);
 
         const { url, bucket, key, error } = data;
         if (error) {
@@ -94,57 +750,152 @@
           throw new Error(`Upload failed (${message.trim()})`);
         }
 
-        setStatus(`Upload complete! Stored as s3://${bucket}/${key}`);
-        fileInput.value = "";
+        setStatus(`Upload complete! Stored as ${key} (target: ${targetLanguage})`);
+        if (fileInput) {
+          fileInput.value = "";
+          handleFileSelection({ target: fileInput });
+        } else {
+          resetLanguageSelection();
+        }
+        refreshDownloadLists().catch((err) => console.error("Failed to refresh lists after upload", err));
       } catch (err) {
         setStatus(err.message || "Upload failed.", true);
       }
     }
 
-    async function downloadFile(kind) {
+    async function requestDownloadUrl(kind, filename) {
+      const folder = FOLDER_MAP[kind];
+      if (!folder) {
+        throw new Error(`Unknown download type '${kind}'.`);
+      }
+
+      const res = await fetch(
+        `${DOWNLOAD_ENDPOINT}?folder=${encodeURIComponent(folder)}&filename=${encodeURIComponent(filename)}`
+      );
+
+      if (!res.ok) {
+        if (res.status === 404) {
+          throw new Error("File not found. Check the filename and try again.");
+        }
+        throw new Error(`Failed to get download URL (${res.status})`);
+      }
+
+      const payload = await res.json();
+      const data = parseLambdaPayload(payload);
+
+      const { url, error } = data;
+      if (error) {
+        throw new Error(error);
+      }
+      if (!url) {
+        throw new Error("Download URL missing from response.");
+      }
+
+      return url;
+    }
+
+    async function downloadFile(kind, overrideFilename, forceDownload = false) {
       const folder = FOLDER_MAP[kind];
       if (!folder) {
         setStatus(`Unknown download type '${kind}'.`, true);
         return;
       }
 
-      const filename = document.getElementById("filename").value.trim();
+      const filenameInput = document.getElementById("filename");
+      const rawFilename = overrideFilename ?? filenameInput.value;
+      const filename = (rawFilename || "").trim();
       if (!filename) {
         setStatus("Enter the original filename before downloading.", true);
         return;
       }
+      if (overrideFilename) {
+        filenameInput.value = overrideFilename;
+      }
 
-      setStatus(`Requesting ${kind} download link...`);
+      setStatus(`Requesting ${kind} download link for ${filename}...`);
 
       try {
-        const res = await fetch(
-          `${DOWNLOAD_ENDPOINT}?folder=${encodeURIComponent(folder)}&filename=${encodeURIComponent(filename)}`
-        );
-
-        if (!res.ok) {
-          throw new Error(`Failed to get download URL (${res.status})`);
+        const url = await requestDownloadUrl(kind, filename);
+        if (forceDownload) {
+          const res = await fetch(url);
+          if (!res.ok) {
+            if (res.status === 404) {
+              throw new Error("File not found. Check the filename and try again.");
+            }
+            throw new Error(`Failed to download file (${res.status})`);
+          }
+          const blob = await res.blob();
+          const downloadUrl = URL.createObjectURL(blob);
+          const anchor = document.createElement("a");
+          anchor.href = downloadUrl;
+          anchor.download = filename;
+          document.body.appendChild(anchor);
+          anchor.click();
+          anchor.remove();
+          URL.revokeObjectURL(downloadUrl);
+          setStatus(`Downloaded ${filename}.`);
+        } else {
+          window.open(url, "_blank", "noopener");
+          setStatus("Download link opened in a new tab.");
         }
-
-        const payload = await res.json();
-        const data =
-          typeof payload.body === "string" && !payload.url
-            ? JSON.parse(payload.body)
-            : payload;
-
-        const { url, error } = data;
-        if (error) {
-          throw new Error(error);
-        }
-        if (!url) {
-          throw new Error("Download URL missing from response.");
-        }
-
-        window.open(url, "_blank", "noopener");
-        setStatus("Download link opened in a new tab.");
       } catch (err) {
         setStatus(err.message || "Download failed.", true);
       }
     }
+
+    async function deleteFile(kind, filename) {
+      const folder = FOLDER_MAP[kind];
+      if (!folder) {
+        setStatus(`Unknown delete type '${kind}'.`, true);
+        return;
+      }
+
+      const confirmed = await showConfirm(`Delete ${filename}? This cannot be undone.`);
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        setStatus(`Deleting ${filename}...`);
+        const res = await fetch(
+          `${DOWNLOAD_ENDPOINT}?folder=${encodeURIComponent(folder)}&filename=${encodeURIComponent(filename)}`,
+          { method: "DELETE" }
+        );
+        if (!res.ok) {
+          const data = parseLambdaPayload(await res.json().catch(() => ({})));
+          const message = data.error || (res.status === 404 ? "File not found." : `Delete failed (${res.status})`);
+          throw new Error(message);
+        }
+        setStatus(`Deleted ${filename}.`);
+        refreshDownloadLists().catch((err) => console.error("Failed to refresh lists after delete", err));
+      } catch (err) {
+        setStatus(err.message || "Delete failed.", true);
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      populateLanguageSelect();
+      resetLanguageSelection();
+      uploadFileInput?.addEventListener("change", handleFileSelection);
+
+      refreshDownloadLists().catch((err) => {
+        console.error(err);
+        setStatus("Unable to load file lists right now.", true);
+      });
+
+      try {
+        const counterEl = document.getElementById("visitorCounter");
+        if (counterEl) {
+          const key = "summary-translator-visitor-count";
+          const current = Number(localStorage.getItem(key) || "0");
+          const next = current + 1;
+          localStorage.setItem(key, String(next));
+          counterEl.textContent = `Visitors: ${next.toLocaleString()}`;
+        }
+      } catch (err) {
+        console.warn("Visitor counter unavailable", err);
+      }
+    });
   </script>
 </body>
 </html>

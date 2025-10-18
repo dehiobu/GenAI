@@ -16,6 +16,44 @@ TRANSLATION_PREFIX = os.environ.get("TRANSLATION_PREFIX", "translations/")
 TARGET_LANG = os.environ.get("TARGET_LANG", "fr")
 MODEL_ID = os.environ.get("MODEL_ID", "anthropic.claude-3-haiku-20240307-v1:0")
 MAX_BYTES = int(os.environ.get("MAX_BYTES", "500000"))
+INGEST_PREFIX = "incoming/"
+LANGUAGE_PATTERN = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z]{2,4})?$")
+FALLBACK_TARGET_LANG = "fr"
+
+
+def _canonical_language(value: str) -> str:
+    candidate = (value or "").strip()
+    if not candidate:
+        raise ValueError("missing language")
+    if not LANGUAGE_PATTERN.fullmatch(candidate):
+        raise ValueError("invalid language")
+    parts = candidate.split("-", 1)
+    if len(parts) == 1:
+        return parts[0].lower()
+    primary, region = parts
+    return f"{primary.lower()}-{region.upper()}"
+
+
+try:
+    DEFAULT_TARGET_LANG = _canonical_language(TARGET_LANG)
+except ValueError:
+    DEFAULT_TARGET_LANG = _canonical_language(FALLBACK_TARGET_LANG)
+
+
+def _ensure_prefix(prefix: str) -> str:
+    return prefix if prefix.endswith("/") else f"{prefix}/"
+
+
+def _resolve_target_language(key: str) -> str:
+    if key.startswith(INGEST_PREFIX):
+        remainder = key[len(INGEST_PREFIX) :]
+        candidate, sep, _ = remainder.partition("/")
+        if sep and candidate:
+            try:
+                return _canonical_language(candidate)
+            except ValueError:
+                pass
+    return DEFAULT_TARGET_LANG
 
 
 def _read_s3_text(bucket, key, max_bytes=MAX_BYTES) -> str:
@@ -222,8 +260,10 @@ def lambda_handler(event, context):
     in_key = unquote_plus(rec["s3"]["object"]["key"])
 
     base_name = in_key.split("/")[-1].rsplit(".", 1)[0]
-    summary_key = f"{SUMMARY_PREFIX}{base_name}.summary.txt"
-    translation_key = f"{TRANSLATION_PREFIX}{base_name}.summary.{TARGET_LANG}.txt"
+    target_lang = _resolve_target_language(in_key)
+    summary_key = f"{_ensure_prefix(SUMMARY_PREFIX)}{base_name}.summary.txt"
+    translation_dir = f"{_ensure_prefix(TRANSLATION_PREFIX)}{target_lang}/"
+    translation_key = f"{translation_dir}{base_name}.summary.{target_lang}.txt"
 
     try:
         text = _read_s3_text(in_bucket, in_key)
@@ -231,7 +271,7 @@ def lambda_handler(event, context):
         summary = _dedupe_lines(summary)
         _put_text(OUTPUT_BUCKET, summary_key, summary)
 
-        translated = _translate(summary, TARGET_LANG)
+        translated = _translate(summary, target_lang)
         translated = _dedupe_lines(translated)
         _put_text(OUTPUT_BUCKET, translation_key, translated)
 
@@ -239,13 +279,14 @@ def lambda_handler(event, context):
             "status": "ok",
             "summary_key": summary_key,
             "translation_key": translation_key,
+            "target_lang": target_lang,
         }
     except Exception as e:
-        err_key = f"errors/{base_name}.error.json"
+        err_key = f"errors/{base_name}.{target_lang}.error.json"
         _put_text(
             OUTPUT_BUCKET,
             err_key,
-            json.dumps({"input_key": in_key, "error": str(e)}, indent=2),
+            json.dumps({"input_key": in_key, "error": str(e), "target_lang": target_lang}, indent=2),
         )
         raise
 
