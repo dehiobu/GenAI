@@ -57,12 +57,21 @@ def _list_files(config: Dict[str, str]) -> List[Dict[str, Any]]:
         filename = key[len(prefix) :]
         last_modified = obj.get("LastModified")
         timestamp = last_modified.timestamp() if last_modified else 0.0
+        language = None
+        display_name = filename
+        if prefix.rstrip("/") == "translations":
+            lang_part, sep, remainder = filename.partition("/")
+            if sep and remainder:
+                language = lang_part
+                display_name = remainder
         entries.append(
             (
                 timestamp,
                 {
                     "key": key,
                     "filename": filename,
+                    "display": display_name if display_name != filename else None,
+                    "language": language,
                     "size": obj.get("Size", 0),
                     "last_modified": last_modified.isoformat() if last_modified else None,
                 },

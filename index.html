@@ -59,6 +59,9 @@
     .upload-actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
     .upload-actions input[type="file"] { padding: 0.45rem; border: 1px solid #c8ced6; border-radius: 6px; background: #fff; width: 14rem; }
     .upload-actions button { margin-top: 0; }
+    .language-select { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap; }
+    .language-select label { font-weight: 600; color: #2a3744; }
+    .language-select select { min-width: 16rem; padding: 0.4rem 0.6rem; border: 1px solid #c8ced6; border-radius: 6px; background-color: #fff; color: #1f2b38; }
     .download-grid { display: flex; flex-wrap: wrap; gap: 1.75rem; margin-top: 1.75rem; }
     .download-column { flex: 1 1 18rem; min-width: 16rem; }
     .download-column h3 { margin-bottom: 0.6rem; color: #0b5394; }
@@ -243,6 +246,12 @@
         <input type="file" id="uploadFile" accept=".txt,.md,.docx,.pdf">
         <button type="button" onclick="uploadToS3()">Upload</button>
       </div>
+      <div id="languageSelector" class="language-select hidden">
+        <label for="targetLanguage">Translate to:</label>
+        <select id="targetLanguage" disabled>
+          <option value="" disabled selected>Select target language</option>
+        </select>
+      </div>
       <div id="status"></div>
     </section>
 
@@ -284,7 +293,7 @@
     <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
       <h2 id="helpTitle">How to Use Summary Translator</h2>
       <ol>
-        <li><strong>Upload a document:</strong> click <em>Browse…</em>, pick your file, then press <em>Upload</em>. Wait for the “Upload complete” status.</li>
+        <li><strong>Upload a document:</strong> click <em>Browse...</em>, pick your file, choose a target language from the dropdown that appears, then press <em>Upload</em>. Wait for the "Upload complete" status.</li>
         <li><strong>Refresh the lists:</strong> tap <em>Refresh lists</em> to load new summaries, translations, or error messages.</li>
         <li><strong>Open or download:</strong> click any filename to view it in a new tab, or use the manual buttons to download directly.</li>
         <li><strong>Remove unwanted files:</strong> use the red delete icon. Confirm when prompted—deletes cannot be undone.</li>
@@ -310,6 +319,83 @@
     const DOWNLOAD_ENDPOINT = "https://r62nxdnlhi.execute-api.us-east-1.amazonaws.com/default/GenerateDownloadURL";
     const FOLDER_MAP = { summary: "summaries", translation: "translations", error: "errors" };
     const LIST_IDS = { summary: "summaryList", translation: "translationList", error: "errorList" };
+    const LANGUAGE_OPTIONS = [
+      { value: "af", label: "Afrikaans" },
+      { value: "sq", label: "Albanian" },
+      { value: "am", label: "Amharic" },
+      { value: "ar", label: "Arabic" },
+      { value: "hy", label: "Armenian" },
+      { value: "az", label: "Azerbaijani" },
+      { value: "bn", label: "Bengali" },
+      { value: "bs", label: "Bosnian" },
+      { value: "bg", label: "Bulgarian" },
+      { value: "ca", label: "Catalan" },
+      { value: "zh", label: "Chinese (Simplified)" },
+      { value: "zh-TW", label: "Chinese (Traditional)" },
+      { value: "hr", label: "Croatian" },
+      { value: "cs", label: "Czech" },
+      { value: "da", label: "Danish" },
+      { value: "fa-AF", label: "Dari" },
+      { value: "nl", label: "Dutch" },
+      { value: "en", label: "English" },
+      { value: "et", label: "Estonian" },
+      { value: "fa", label: "Farsi (Persian)" },
+      { value: "tl", label: "Filipino (Tagalog)" },
+      { value: "fi", label: "Finnish" },
+      { value: "fr", label: "French" },
+      { value: "fr-CA", label: "French (Canada)" },
+      { value: "ka", label: "Georgian" },
+      { value: "de", label: "German" },
+      { value: "el", label: "Greek" },
+      { value: "gu", label: "Gujarati" },
+      { value: "ht", label: "Haitian Creole" },
+      { value: "ha", label: "Hausa" },
+      { value: "he", label: "Hebrew" },
+      { value: "hi", label: "Hindi" },
+      { value: "hu", label: "Hungarian" },
+      { value: "is", label: "Icelandic" },
+      { value: "id", label: "Indonesian" },
+      { value: "ga", label: "Irish" },
+      { value: "it", label: "Italian" },
+      { value: "ja", label: "Japanese" },
+      { value: "kn", label: "Kannada" },
+      { value: "kk", label: "Kazakh" },
+      { value: "ko", label: "Korean" },
+      { value: "lv", label: "Latvian" },
+      { value: "lt", label: "Lithuanian" },
+      { value: "mk", label: "Macedonian" },
+      { value: "ms", label: "Malay" },
+      { value: "ml", label: "Malayalam" },
+      { value: "mt", label: "Maltese" },
+      { value: "mr", label: "Marathi" },
+      { value: "mn", label: "Mongolian" },
+      { value: "no", label: "Norwegian" },
+      { value: "ps", label: "Pashto" },
+      { value: "pl", label: "Polish" },
+      { value: "pt", label: "Portuguese" },
+      { value: "pt-PT", label: "Portuguese (Portugal)" },
+      { value: "pa", label: "Punjabi" },
+      { value: "ro", label: "Romanian" },
+      { value: "ru", label: "Russian" },
+      { value: "sr", label: "Serbian" },
+      { value: "si", label: "Sinhala" },
+      { value: "sk", label: "Slovak" },
+      { value: "sl", label: "Slovenian" },
+      { value: "so", label: "Somali" },
+      { value: "es", label: "Spanish" },
+      { value: "es-MX", label: "Spanish (Mexico)" },
+      { value: "sw", label: "Swahili" },
+      { value: "sv", label: "Swedish" },
+      { value: "ta", label: "Tamil" },
+      { value: "te", label: "Telugu" },
+      { value: "th", label: "Thai" },
+      { value: "tr", label: "Turkish" },
+      { value: "uk", label: "Ukrainian" },
+      { value: "ur", label: "Urdu" },
+      { value: "uz", label: "Uzbek" },
+      { value: "vi", label: "Vietnamese" },
+      { value: "cy", label: "Welsh" }
+    ];
     const helpButton = document.getElementById("helpButton");
     const helpOverlay = document.getElementById("helpOverlay");
     const helpClose = document.getElementById("helpClose");
@@ -317,6 +403,9 @@
     const confirmMessageEl = document.getElementById("confirmMessage");
     const confirmOk = document.getElementById("confirmOk");
     const confirmCancel = document.getElementById("confirmCancel");
+    const languageSelector = document.getElementById("languageSelector");
+    const languageSelect = document.getElementById("targetLanguage");
+    const uploadFileInput = document.getElementById("uploadFile");
     let confirmResolver = null;
 
     function openHelp() {
@@ -379,6 +468,55 @@
       const statusEl = document.getElementById("status");
       statusEl.textContent = message;
       statusEl.className = isError ? "error" : "";
+    }
+
+    function populateLanguageSelect() {
+      if (!languageSelect) {
+        return;
+      }
+
+      languageSelect.innerHTML = "";
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "Select target language";
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      languageSelect.appendChild(placeholder);
+
+      LANGUAGE_OPTIONS.forEach(({ value, label }) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = `${label} (${value})`;
+        languageSelect.appendChild(option);
+      });
+
+      languageSelect.disabled = true;
+    }
+
+    function resetLanguageSelection() {
+      if (languageSelector) {
+        languageSelector.classList.add("hidden");
+      }
+      if (languageSelect) {
+        languageSelect.value = "";
+        languageSelect.disabled = true;
+      }
+    }
+
+    function handleFileSelection(evt) {
+      const hasFile = Boolean(evt?.target?.files?.length);
+      if (!hasFile) {
+        resetLanguageSelection();
+        return;
+      }
+
+      if (languageSelector) {
+        languageSelector.classList.remove("hidden");
+      }
+      if (languageSelect) {
+        languageSelect.disabled = false;
+        languageSelect.focus();
+      }
     }
 
     // API Gateway wraps Lambda responses differently when proxy integration is used,
@@ -459,11 +597,21 @@
 
         const header = document.createElement("div");
         header.className = "file-header";
-        const displayName = file?.filename || file?.key || "download";
+        const objectPath = file?.filename || file?.key || "download";
+        let displayName = file?.display || objectPath;
+        let languageCode = file?.language || null;
+        if (!file?.display && kind === "translation" && objectPath.includes("/")) {
+          const [maybeLang, remainder] = objectPath.split("/", 2);
+          if (maybeLang && remainder) {
+            languageCode = languageCode || maybeLang;
+            displayName = remainder;
+          }
+        }
         const nameEl = document.createElement("span");
         nameEl.className = "file-name";
         nameEl.textContent = displayName;
-        nameEl.addEventListener("click", () => downloadFile(kind, displayName));
+        nameEl.title = objectPath;
+        nameEl.addEventListener("click", () => downloadFile(kind, objectPath));
         header.appendChild(nameEl);
         li.appendChild(header);
 
@@ -486,12 +634,15 @@
         `;
         deleteBtn.addEventListener("click", (e) => {
           e.stopPropagation();
-          deleteFile(kind, displayName);
+          deleteFile(kind, objectPath);
         });
         actions.appendChild(deleteBtn);
         li.appendChild(actions);
 
         const metaParts = [];
+        if (languageCode) {
+          metaParts.push(`Lang ${languageCode.toUpperCase()}`);
+        }
         const when = formatTimestamp(file?.last_modified);
         if (when) {
           metaParts.push(when);
@@ -548,20 +699,27 @@
       }
 
     async function uploadToS3() {
-      const fileInput = document.getElementById("uploadFile");
-      const file = fileInput.files[0];
+      const fileInput = uploadFileInput;
+      const file = fileInput?.files?.[0];
 
       if (!file) {
         setStatus("Select a file before uploading.", true);
         return;
       }
 
-      setStatus(`Requesting upload URL for ${file.name}...`);
+      const targetLanguage = (languageSelect?.value || "").trim();
+      if (!targetLanguage) {
+        setStatus("Select a target language before uploading.", true);
+        languageSelect?.focus();
+        return;
+      }
+
+      setStatus(`Requesting upload URL for ${file.name} (target: ${targetLanguage})...`);
 
       try {
         const contentType = file.type || "application/octet-stream";
         const presignRes = await fetch(
-          `${UPLOAD_ENDPOINT}?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(contentType)}`
+          `${UPLOAD_ENDPOINT}?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(contentType)}&lang=${encodeURIComponent(targetLanguage)}`
         );
         if (!presignRes.ok) {
           throw new Error(`Failed to get upload URL (${presignRes.status})`);
@@ -592,8 +750,13 @@
           throw new Error(`Upload failed (${message.trim()})`);
         }
 
-        setStatus(`Upload complete! Stored as ${key}`);
-        fileInput.value = "";
+        setStatus(`Upload complete! Stored as ${key} (target: ${targetLanguage})`);
+        if (fileInput) {
+          fileInput.value = "";
+          handleFileSelection({ target: fileInput });
+        } else {
+          resetLanguageSelection();
+        }
         refreshDownloadLists().catch((err) => console.error("Failed to refresh lists after upload", err));
       } catch (err) {
         setStatus(err.message || "Upload failed.", true);
@@ -711,6 +874,10 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
+      populateLanguageSelect();
+      resetLanguageSelection();
+      uploadFileInput?.addEventListener("change", handleFileSelection);
+
       refreshDownloadLists().catch((err) => {
         console.error(err);
         setStatus("Unable to load file lists right now.", true);

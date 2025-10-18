@@ -68,8 +68,9 @@ sequenceDiagram
 
 - **Static UX** – A single `index.html` file with a gradient background, branded badge, upload controls, result panes, manual download buttons, and per-file delete icons.
 - **Presigned upload** – `upload_presign.py` forces uploads into the `incoming/` prefix of the ingest bucket and supports optional content-type hints.
+- **Per-upload language choice** – Each upload is tagged with the language selected in the UI (e.g., `incoming/es/…`), and the worker stores translations under matching prefixes (`translations/es/…`).
 - **List / download / delete** – `download_presign.py` lists objects in `summaries/`, `translations/`, and `errors/`, presigns GET URLs, and supports scoped deletions with S3 IAM permissions.
-- **Processing pipeline** – `app.py` summarises via Amazon Bedrock (default: `anthropic.claude-3-haiku-20240307-v1:0`) and translates via Amazon Translate.
+- **Processing pipeline** – `app.py` summarises via Amazon Bedrock (default: `anthropic.claude-3-haiku-20240307-v1:0`) and translates via Amazon Translate into the language embedded in the source key, falling back to the template default when none is supplied.
 - **Infrastructure as Code** – `template.yaml` (SAM) provisions S3 buckets, Lambdas, roles, and wiring with inline IAM policies.
 - **CI-ready deployment** – `.github/workflows/deploy.yml` uses `appleboy/scp-action` and `appleboy/ssh-action` to sync the static site to an Amazon Lightsail instance over SSH.
 
@@ -136,7 +137,7 @@ aws s3 cp sample.txt s3://genai-in-use1-x7p5f0/incoming/sample.txt --region us-e
 
 # Inspect generated outputs
 aws s3 ls s3://genai-out-use1-x7p5f0/summaries/
-aws s3 ls s3://genai-out-use1-x7p5f0/translations/
+aws s3 ls s3://genai-out-use1-x7p5f0/translations/es/
 aws s3 ls s3://genai-out-use1-x7p5f0/errors/
 ```
 
