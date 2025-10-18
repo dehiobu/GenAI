@@ -37,6 +37,7 @@ def _list_files(config: Dict[str, str]) -> List[Dict[str, Any]]:
     contents = []
 
     while True:
+        # Paginate through S3 listings so large folders don't break the UI.
         kwargs = {"Bucket": bucket, "Prefix": prefix}
         if continuation:
             kwargs["ContinuationToken"] = continuation
@@ -68,11 +69,13 @@ def _list_files(config: Dict[str, str]) -> List[Dict[str, Any]]:
             )
         )
 
+    # Show newest files first so fresh outputs float to the top of the dashboard.
     entries.sort(key=lambda item: item[0], reverse=True)
     return [entry[1] for entry in entries]
 
 
 def _sanitize_filename(filename: str) -> str:
+    # Strip leading slashes and reject traversal patterns to keep keys in-bucket.
     sanitized = filename.lstrip("/")
     if not sanitized:
         raise ValueError("Invalid filename")
@@ -129,6 +132,7 @@ def lambda_handler(event, context):
         key = sanitized if sanitized.startswith(prefix) else f"{prefix}{sanitized}"
 
         try:
+            # Allow the UI to tidy generated files without exposing S3 credentials.
             s3.delete_object(Bucket=config["bucket"], Key=key)
         except s3.exceptions.NoSuchKey:
             return _response(404, {"error": "File not found"})
@@ -155,6 +159,7 @@ def lambda_handler(event, context):
         key = f"{prefix}{sanitized}"
 
     try:
+        # Issue a one-hour GET URL so the browser can download the artefact directly.
         url = s3.generate_presigned_url(
             "get_object",
             Params={"Bucket": config["bucket"], "Key": key},

@@ -79,6 +79,34 @@
     .download-controls label { display: inline-flex; align-items: center; margin: 0; }
     .manual-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
     .manual-buttons button { margin-top: 0; }
+    .help-button {
+      position: absolute;
+      top: 1.4rem;
+      left: 1.35rem;
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(11, 83, 148, 0.22), rgba(255, 193, 7, 0.3));
+      border: 1px solid rgba(11, 83, 148, 0.45);
+      color: #0b355f;
+      font-size: 0.95rem;
+      letter-spacing: 0.16rem;
+      text-transform: uppercase;
+      padding: 0.55rem 1.45rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(11, 83, 148, 0.18);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .help-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 26px rgba(11, 83, 148, 0.24);
+    }
+    .help-button:focus {
+      outline: 3px solid rgba(11, 83, 148, 0.35);
+      outline-offset: 2px;
+    }
+    .page-title {
+      margin-top: 3.4rem;
+    }
     .visitor-counter {
       position: absolute;
       right: 1.5rem;
@@ -90,6 +118,54 @@
       border-radius: 999px;
       padding: 0.35rem 0.9rem;
       box-shadow: 0 6px 14px rgba(15, 26, 44, 0.12);
+    }
+    .help-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 26, 44, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 900;
+    }
+    .help-dialog {
+      background: #fff;
+      border-radius: 18px;
+      padding: 2.2rem;
+      width: min(600px, calc(100% - 3rem));
+      max-height: calc(100% - 4rem);
+      overflow-y: auto;
+      box-shadow: 0 24px 48px rgba(12, 34, 64, 0.28);
+    }
+    .help-dialog h2 {
+      margin: 0 0 1rem;
+      font-size: 1.45rem;
+      color: #0b355f;
+    }
+    .help-dialog ol {
+      padding-left: 1.4rem;
+      color: #4b5563;
+      line-height: 1.55;
+    }
+    .help-dialog li {
+      margin-bottom: 0.9rem;
+    }
+    .help-close {
+      margin-top: 1.2rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5rem 1.2rem;
+      border-radius: 999px;
+      border: 1px solid rgba(11, 83, 148, 0.25);
+      background: rgba(11, 83, 148, 0.08);
+      color: #0b355f;
+      font-weight: 600;
+      cursor: pointer;
+      transition: box-shadow 0.15s ease;
+    }
+    .help-close:hover {
+      box-shadow: 0 8px 18px rgba(11, 83, 148, 0.18);
     }
     .confirm-overlay {
       position: fixed;
@@ -158,9 +234,10 @@
 </head>
 <body>
   <div class="page-frame">
+    <button type="button" class="help-button" id="helpButton" aria-haspopup="dialog" aria-controls="helpOverlay" title="How to use">How to Use</button>
     <div class="page-badge">AI-driven Bedrock | Amazon Translate</div>
     <section>
-      <h1>Summary Translator</h1>
+      <h1 class="page-title">Summary Translator</h1>
       <label for="uploadFile">Choose a text file to process:</label>
       <div class="upload-actions">
         <input type="file" id="uploadFile" accept=".txt,.md,.docx,.pdf">
@@ -203,6 +280,20 @@
       <div class="visitor-counter" id="visitorCounter">Visitors: 0</div>
   </div>
 
+  <div id="helpOverlay" class="help-overlay hidden">
+    <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <h2 id="helpTitle">How to Use Summary Translator</h2>
+      <ol>
+        <li><strong>Upload a document:</strong> click <em>Browse…</em>, pick your file, then press <em>Upload</em>. Wait for the “Upload complete” status.</li>
+        <li><strong>Refresh the lists:</strong> tap <em>Refresh lists</em> to load new summaries, translations, or error messages.</li>
+        <li><strong>Open or download:</strong> click any filename to view it in a new tab, or use the manual buttons to download directly.</li>
+        <li><strong>Remove unwanted files:</strong> use the red delete icon. Confirm when prompted—deletes cannot be undone.</li>
+        <li><strong>Run again:</strong> upload an updated source file at any time. Each run creates a fresh set of artefacts.</li>
+      </ol>
+      <button type="button" class="help-close" id="helpClose">Close</button>
+    </div>
+  </div>
+
   <div id="confirmOverlay" class="confirm-overlay hidden">
     <div class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
       <h3 id="confirmTitle">Confirm Delete</h3>
@@ -219,11 +310,40 @@
     const DOWNLOAD_ENDPOINT = "https://r62nxdnlhi.execute-api.us-east-1.amazonaws.com/default/GenerateDownloadURL";
     const FOLDER_MAP = { summary: "summaries", translation: "translations", error: "errors" };
     const LIST_IDS = { summary: "summaryList", translation: "translationList", error: "errorList" };
+    const helpButton = document.getElementById("helpButton");
+    const helpOverlay = document.getElementById("helpOverlay");
+    const helpClose = document.getElementById("helpClose");
     const confirmOverlay = document.getElementById("confirmOverlay");
     const confirmMessageEl = document.getElementById("confirmMessage");
     const confirmOk = document.getElementById("confirmOk");
     const confirmCancel = document.getElementById("confirmCancel");
     let confirmResolver = null;
+
+    function openHelp() {
+      if (!helpOverlay) return;
+      helpOverlay.classList.remove("hidden");
+      helpOverlay.focus?.();
+      helpClose?.focus();
+    }
+
+    function closeHelp() {
+      if (!helpOverlay || helpOverlay.classList.contains("hidden")) return;
+      helpOverlay.classList.add("hidden");
+      helpButton?.focus();
+    }
+
+    helpButton?.addEventListener("click", openHelp);
+    helpClose?.addEventListener("click", closeHelp);
+    helpOverlay?.addEventListener("click", (evt) => {
+      if (evt.target === helpOverlay && !helpOverlay.classList.contains("hidden")) {
+        closeHelp();
+      }
+    });
+    document.addEventListener("keydown", (evt) => {
+      if (evt.key === "Escape" && helpOverlay && !helpOverlay.classList.contains("hidden")) {
+        closeHelp();
+      }
+    });
 
     function showConfirm(message) {
       return new Promise((resolve) => {
